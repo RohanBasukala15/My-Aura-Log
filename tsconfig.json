@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": "./",
+    "paths": {
+      "@app": ["@app/index"],
+      "@app/*": ["@app/*/index", "@app/*"],
+      "@common": ["common/index"],
+      "@common/*": ["common/*/index", "common/*"]
+    }
+  },
+  "extends": "expo/tsconfig.base",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "metro.config.js",
+    "metro.transformer.js",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

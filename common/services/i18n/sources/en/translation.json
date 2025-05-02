@@ -1,0 +1,174 @@
+{
+  "app_name": "Bravo Sample",
+  "screens": {
+    "onboarding": {
+      "titles": {
+        "page_1": "Welcome to Bravo!",
+        "page_2": "Discover Bravo’s Offerings",
+        "page_3": "Join us",
+        "page_4": "Let's Get Started!"
+      },
+      "messages": {
+        "page_1": "Explore our unique solutions tailored just for you",
+        "page_2": "Experience intuitive and seamless usability",
+        "page_3": "Join us and be part of the Bravo family today",
+        "page_4": "Start your journey with Bravo"
+      },
+      "labels": {
+        "skip": "Skip"
+      },
+      "actions": {
+        "get_started": "Get Started",
+        "signup": "Sign up"
+      }
+    },
+    "signup": {},
+    "add_relatives": {
+      "titles": {
+        "heading": "Add Relatives"
+      }
+    },
+    "setPassword": {
+      "titles": {
+        "setPassword": "Set Password",
+        "safe_strong": "Make sure your password is safe and strong"
+      },
+      "labels": {
+        "password": "Password",
+        "validation_rules": "Password should be of {{character}} or more characters with letters, numbers & symbols.",
+        "confirm_password": "Enter Confirm Password",
+        "placeholder_confirm_password": "Confirm Password"
+      },
+      "actions": {
+        "proceed": "PROCEED"
+      }
+    },
+    "login": {
+      "titles": {
+        "welcome_text": "Hi, Welcome to Bravo Sample App"
+      },
+      "labels": {
+        "email": "Email",
+        "password": "Password",
+        "dont_have_an_account": "Don't have account? ",
+        "enter_password": "Enter Password",
+        "keep_signed_in": "Remember me",
+        "or_sign_with": "or Sign with"
+      },
+      "placeholder": {
+        "email": "Enter your email",
+        "password": "Enter your password"
+      },
+      "actions": {
+        "sign_in": "Sign in",
+        "sign_up": "Sign Up",
+        "forgot_password": "Forgot password?"
+      }
+    },
+    "forgotPassword": {
+      "titles": {
+        "title": "Forgot Password",
+        "subTitle": "An OTP will be sent to this number for the verification."
+      },
+      "labels": {
+        "mobile_number_label": "Mobile Number",
+        "mobile_number_placeholder": "Enter Mobile Number"
+      },
+      "messages": {
+        "success_title": "Password Changed",
+        "success_message": "Now you can access your dashboard"
+      },
+      "actions": {
+        "next": "Next",
+        "navigate_to_dashboard": "Navigate to Dashboard"
+      }
+    },
+    "menus": {
+      "titles": {
+        "navigation": "Menu"
+      },
+      "labels": {
+        "account": "Account",
+        "menus": {
+          "change_password": "Change Password",
+          "terms_and_condition": "Terms & Conditions",
+          "privacy_policy": "Privacy Policy",
+          "faqs": "FAQs",
+          "logout": "Logout"
+        }
+      },
+      "messages": {
+        "navigation": "Choose desired options from the menu to access it."
+      }
+    },
+    "change_password": {
+      "titles": {
+        "setPassword": "Set Password",
+        "safe_strong": "Make sure your password is safe and strong"
+      },
+      "labels": {
+        "current_password": "Current Password",
+        "new_password": "New Password",
+        "validation_rules": "Password should be of {{character}} or more characters with letters, numbers & symbols.",
+        "confirm_password": "Enter Confirm Password",
+        "placeholder_confirm_password": "Confirm Password"
+      },
+      "messages": {
+        "password_change_title": "Password Change Successfully",
+        "password_change_description": "You can now access your account with new password."
+      },
+      "actions": {
+        "proceed": "PROCEED",
+        "back_to_dashboard": "Back to Dashboard"
+      }
+    },
+    "edit_profile": {
+      "titles": {
+        "heading": "Edit Profile",
+        "subHeading": "Here you can edit your profile info."
+      },
+      "message": {
+        "wrong_file_format": "Unsupported file format."
+      },
+      "labels": {
+        "name": "Name",
+        "mobile_number": "Mobile Number",
+        "email": "Email"
+      },
+      "actions": {
+        "save": "Save"
+      }
+    },
+    "dashboard": {
+      "labels": {
+        "greeting_type": {
+          "morning": "Morning",
+          "afternoon": "Afternoon",
+          "evening": "Evening"
+        }
+      }
+    }
+  },
+  "components": {
+    "errorDisplay": {
+      "labels": {
+        "refresh": "REFRESH"
+      }
+    },
+    "filePicker": {
+      "label": {
+        "camera": "Camera",
+        "files": "Files",
+        "select_option": "Select Options",
+        "failed_to_write_file": "Failed to write a file",
+        "could_not_select_image": "Could not select the image",
+        "could_not_save_image": "Could not save the image"
+      },
+      "message": {
+        "image_cancelled": "Image capture cancelled by the user",
+        "media_cancelled": "Media selection cancelled by the user",
+        "file_write_failed": "Failed to write a file"
+      }
+    }
+  }
+}

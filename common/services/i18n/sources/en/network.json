@@ -1,0 +1,10 @@
+{
+  "not_allowed": "You're not allowed to perform this task.",
+  "unauthorized": "You're not authorized to perform this task.",
+  "unexpected": "Some error occurred, Please contact to the administrator.",
+  "bad_request": "There's an error on your request, Please try again later.",
+  "conflict": "There's been a conflict on your request, Please try again later.",
+  "server_not_responding": "Could not establish connection with server, please try again",
+  "general": "An error occurred while connecting to the server, Please contact to the administrator.",
+  "no_internet_connection": "Could not establish connection. Please make sure you are connected to internet."
+}
