@@ -1,8 +1,8 @@
 import { createTheme } from "@shopify/restyle";
 
 export const appLightPalette = {
-  primary: "#007acc",
-  secondary: "#34c759",
+  primary: "#9B87F5", // Lavender
+  secondary: "#7DD3C0", // Teal
 
   white: "#FFFFFF",
   black: "#061A23",
@@ -14,10 +14,10 @@ export const appLightPalette = {
   highlight: "#3DDBD9",
   success: "#7DDE86",
 
-  backgroundDefault: "#f5f5f5",
+  backgroundDefault: "#F8F6FF", // Soft lavender background
   backgroundHovered: "#F1F2F3",
   backgroundPressed: "#EDEEEF",
-  backgroundSelected: "#EDEEEF",
+  backgroundSelected: "#E8D5FF", // Light lavender
 
   divider: "#DBDBDB",
 
@@ -42,7 +42,7 @@ export const appLightPalette = {
   surfaceSuccessDefault: "rgba(249, 255, 246, 1)",
 
   textDefault: "#333333",
-  textSubdued: "#C8D1E1",
+  textSubdued: "#7D828A",
   textDisabled: "#C8D1E1",
   textCritical: "rgba(255, 33, 0, 1)",
   textWarning: "rgba(145, 106, 0, 1)",
@@ -215,7 +215,6 @@ const lightTheme = createTheme({
     },
     default: {
       fontSize: 18,
-      color: "textDefault",
       fontWeight: "400",
       fontStyle: "normal",
       fontFamily: "HankenGrotesk_400Regular",

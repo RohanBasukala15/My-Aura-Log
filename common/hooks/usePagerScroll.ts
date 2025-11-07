@@ -1,7 +1,8 @@
-import { DependencyList } from "react";
 import { NativeSyntheticEvent } from "react-native";
 import { useEvent, useHandler } from "react-native-reanimated";
-import { OnPageScrollEventData } from "react-native-pager-view/lib/typescript/PagerViewNativeComponent";
+import type { PagerViewOnPageScrollEventData } from "react-native-pager-view";
+
+type HandlerDependencies = Array<unknown> | undefined;
 
 export type BubblingEventHandler<T, PaperName extends string | never = never> = (
   event: NativeSyntheticEvent<T>
@@ -9,14 +10,15 @@ export type BubblingEventHandler<T, PaperName extends string | never = never> = 
 
 export function usePagerScrollHandler(
   handlers: {
-    onPageScroll: (event: OnPageScrollEventData, context: object) => void;
+    onPageScroll: (event: PagerViewOnPageScrollEventData, context: object) => void;
   },
-  dependencies?: DependencyList
+  dependencies?: HandlerDependencies
 ) {
-  const { context, doDependenciesDiffer } = useHandler(handlers, dependencies);
+  const normalizedDependencies = dependencies ?? [];
+  const { context, doDependenciesDiffer } = useHandler(handlers, normalizedDependencies as HandlerDependencies);
   const subscribeForEvents = ["onPageScroll"];
 
-  return useEvent<OnPageScrollEventData & { eventName: string }>(
+  return useEvent<PagerViewOnPageScrollEventData & { eventName: string }>(
     (event) => {
       "worklet";
       const { onPageScroll } = handlers;
@@ -26,5 +28,5 @@ export function usePagerScrollHandler(
     },
     subscribeForEvents,
     doDependenciesDiffer
-  ) as never as BubblingEventHandler<OnPageScrollEventData>;
+  ) as never as BubblingEventHandler<PagerViewOnPageScrollEventData>;
 }

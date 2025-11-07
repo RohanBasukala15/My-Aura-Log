@@ -3,13 +3,13 @@ import { View } from "react-native";
 import { SplashScreen, useNavigationContainerRef } from "expo-router";
 
 import { useAppConfiguration } from "./context";
-import { useLoadAssets } from "./FontConfiguration";
+import { useLoadAssets, appFonts } from "./FontConfiguration";
 
 export type AppConfigurationProps = {
   assets: readonly number[];
 };
 
-const fonts = {};
+const fonts = appFonts;
 
 export const AppConfiguration = React.memo(function $AppConfiguration({
   children,
@@ -29,7 +29,7 @@ export const AppConfiguration = React.memo(function $AppConfiguration({
       return;
     }
 
-    let id: NodeJS.Timeout | undefined;
+    let id: ReturnType<typeof setInterval> | undefined;
     const cleanup = () => {
       if (id) {
         clearInterval(id);
@@ -77,9 +77,9 @@ export const AppConfiguration = React.memo(function $AppConfiguration({
       onLayout={() => {
         if (!ready) return;
         appConfig.updateState({ isUIReady: true });
-      }}
-    >
+      }}>
       {children}
     </View>
   );
 });
+

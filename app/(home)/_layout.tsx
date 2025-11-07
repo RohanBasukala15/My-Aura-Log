@@ -1,52 +1,26 @@
 import React from "react";
-import { Tabs } from "expo-router";
+import { Stack } from "expo-router";
 
-import { Home, Menu } from "@common/assets";
-import { AppFonts, ScreenOptions, useScreenOptions, useTheme } from "@common/components";
-
-const useTabScreenOptions = (): ScreenOptions<"Tab"> => {
-  const theme = useTheme();
-  const screenOptions = useScreenOptions<"Tab">();
-
-  return {
-    ...screenOptions,
-    tabBarStyle: {
-      elevation: 0,
-      marginTop: 12,
-      borderTopWidth: 0,
-    },
-    tabBarLabelStyle: {
-      fontSize: 12,
-      fontStyle: "normal",
-      fontFamily: AppFonts.Regular_400,
-    },
-    tabBarShowLabel: true,
-    tabBarActiveTintColor: theme.colors.primary,
-    tabBarInactiveTintColor: theme.colors.iconsDisabled,
-  };
+export const unstable_settings = {
+  initialRouteName: "(tabs)",
 };
 
-function BottomTab() {
-  const screenOptions = useTabScreenOptions();
-
+function HomeLayout() {
   return (
-    <Tabs screenOptions={screenOptions}>
-      <Tabs.Screen
-        name="dashboard"
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="entry-detail"
         options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => <Home width={size} height={size} fill={color} />,
+          presentation: "modal",
+          animation: "slide_from_bottom",
+          headerShown: false,
+          gestureEnabled: true,
+          gestureDirection: "vertical",
         }}
       />
-      <Tabs.Screen
-        name="menus"
-        options={{
-          title: "Menu",
-          tabBarIcon: ({ color, size }) => <Menu width={size} height={size} fill={color} />,
-        }}
-      />
-    </Tabs>
+    </Stack>
   );
 }
 
-export default BottomTab;
+export default HomeLayout;

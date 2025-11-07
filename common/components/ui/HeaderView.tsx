@@ -16,7 +16,7 @@ interface HeaderViewProps {
   backActionVisible?: boolean;
   disabled?: boolean;
   enableParentRoute?: boolean;
-  fallBackRoute?: Href<string>;
+  fallBackRoute?: Href;
   onBackPress?: () => void;
   prefixAction?: (props: HeaderActionProps) => React.ReactNode;
   suffixAction?: (props: HeaderActionProps) => React.ReactNode;
@@ -46,13 +46,12 @@ export function HeaderView({
           android_ripple={{ color: colorAlpha(theme.colors.primary, 0.12) }}
           hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
           onPress={() => {
-            if (!router.canGoBack() && enableParentRoute) {
-              router.replace(fallBackRoute as never as Href<string>);
+            if (!router.canGoBack() && enableParentRoute && fallBackRoute) {
+              router.replace(fallBackRoute);
               return;
             }
             onBackPress ? onBackPress() : router.back();
-          }}
-        >
+          }}>
           <View style={styles.backButtonIconStyle}>
             <ChevronLeft width={9} height={15} color={theme.colors.black} />
           </View>
@@ -84,3 +83,4 @@ const useStyles = () => {
     },
   });
 };
+

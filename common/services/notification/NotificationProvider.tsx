@@ -9,6 +9,8 @@ import AppConstants from "../../assets/AppConstants";
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: false,
     shouldSetBadge: false,
   }),
@@ -57,3 +59,4 @@ const NotificationProvider = React.memo(function Wrapper() {
 });
 
 export { NotificationProvider };
+

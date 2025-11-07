@@ -64,8 +64,38 @@ const usesCleartextTraffic = process.env.EXPO_PUBLIC_apiEndpoint?.startsWith("ht
 
 module.exports = ({ config }) => {
   const overridesConfig = {
+    name: "My Aura Log",
+    slug: "myauralog",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "automatic",
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#E8D5FF",
+    },
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.myauralog.app",
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#E8D5FF",
+      },
+      package: "com.myauralog",
+    },
     plugins: [
       ["expo-build-properties", { android: { usesCleartextTraffic } }],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/icon.png",
+          color: "#9B87F5",
+          sounds: [],
+        },
+      ],
     ],
     updates: {
       fallbackToCacheTimeout: 1200,

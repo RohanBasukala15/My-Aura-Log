@@ -16,5 +16,6 @@ export default function EntryPoint() {
     return <LoadingScreen />;
   }
 
-  return <Redirect href={"/(auth)/onboarding"} />;
+  // Redirect directly to dashboard (Journal Entry screen)
+  return <Redirect href={"/(home)/(tabs)/dashboard"} />;
 }

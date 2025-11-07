@@ -57,3 +57,95 @@
     "production": {}
   }
 }
+
+
+// #
+// #
+// #
+// # App compile-time environments
+// #
+
+// # App Details
+// EXPO_CONFIG_scheme=myauralog
+// EXPO_CONFIG_name=My Aura Log
+// EXPO_CONFIG_owner=rohan_basukala
+// EXPO_CONFIG_slug=my-aura-log
+
+// EXPO_CONFIG_orientation=portrait
+// EXPO_CONFIG_icon=./assets/icon.png
+// EXPO_CONFIG_version=1.0.0
+
+// # Web Configuration
+// EXPO_CONFIG_web_bundler=metro
+
+// # New Architecture
+// EXPO_CONFIG_newArchEnabled=true
+
+// # Splash Screen
+// EXPO_CONFIG_splash_image=./assets/splash.png
+// EXPO_CONFIG_splash_resizeMode=contain
+// EXPO_CONFIG_splash_backgroundColor="#ffffff"
+
+// # Experiments
+// EXPO_CONFIG_experiments_typedRoutes=true
+// EXPO_CONFIG_experiments_tsconfigPaths=false
+
+// #Active App
+// APP_CODE=my-aura-log
+
+// # iOS Configuration
+// EXPO_CONFIG_ios_runtimeVersion=1.0.0
+// EXPO_CONFIG_ios_buildNumber=0
+// EXPO_CONFIG_ios_bundleIdentifier=com.myauralog.app
+// EXPO_CONFIG_ios_googleServicesFile=./GoogleService-Info.plist
+// EXPO_CONFIG_ios_infoPlist_UIBackgroundModes=[remote-notification]
+// EXPO_CONFIG_ios_infoPlist_UIRequiresFullScreen=true
+// EXPO_CONFIG_ios_supportsTablet=true
+// EXPO_CONFIG_ios_requireFullScreen=true
+// EXPO_CONFIG_ios_infoPlist_CFBundleAllowMixedLocalizations=true
+// EXPO_CONFIG_ios_infoPlist_CFBundleLocalizations=['en']
+
+// # Android Configuration
+// EXPO_CONFIG_android_package=com.myauralog
+// EXPO_CONFIG_android_runtimeVersion=1.0.0
+// EXPO_CONFIG_android_versionCode=1
+// EXPO_CONFIG_android_googleServicesFile=./google-services.json
+// EXPO_CONFIG_android_allowBackup=false
+
+// # Updates & Runtime Policy
+// EXPO_CONFIG_updates_enabled=false
+// # EXPO_CONFIG_updates_url=https://u.expo.dev/0c365bb6-fc28-45bd-a77b-f62feb5afe5b
+// EXPO_CONFIG_updates_fallbackToCacheTimeout=1200
+
+// # Extra Configuration
+// # EXPO_CONFIG_extra_eas_projectId=0c365bb6-fc28-45bd-a77b-f62feb5afe5b
+// EXPO_CONFIG_extra_router_origin=false
+
+// EXPO_PUBLIC_OPENAI_API_KEY=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
+
+// EXPO_PUBLIC_REVENUECAT_API_KEY_IOS=test_DuBCHnARFQwwJzZclvhHJiNKCQi
+// EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=test_DuBCHnARFQwwJzZclvhHJiNKCQi
+
+
+// EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyA3YC5yNeziYYJmLC58ej2xUUKXctVgjeg
+// EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=my-aura-log.firebaseapp.com
+// EXPO_PUBLIC_FIREBASE_PROJECT_ID=my-aura-log
+// EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=my-aura-log.firebasestorage.app
+// EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=1037142646223
+// EXPO_PUBLIC_FIREBASE_APP_ID=1:1037142646223:web:9a7be1cab6d156113cc6ba
+
+
+
+
+// # BED API Endpoints 
+// # EXPO_PUBLIC_apiEndpoint=http://localhost:5110/v1  # local host for iOS
+// # EXPO_PUBLIC_apiEndpoint=http://10.0.2.2:5110/v1  # local host for android
+
+// # EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51QoakqA5ViHy3W8SLPXW3bQvwH3YE6afRf8eNDlqtMSmwelu8cQGIMH304qzZhbDzV9i9PaKLLJoaeuxy6A55Qp700qwbpcill
+// # EXPO_PUBLIC_STRIPE_SECRET_KEY=sk_test_51QoakqA5ViHy3W8S9c3cRGLxsQA7gCEhtI2Cw3sEvAQ1rRHfsMbQ02eKv7K2KG9w45sYosWmYZ3Jyu4E2WqK0YXC00YBCzKrha
+// # EXPO_PUBLIC_siteKey=6Lc01ugqAAAAAPwFotW2twrPz2RWSqUqlrM8Mcy-
+// # EXPO_PUBLIC_secretKey=6Lc01ugqAAAAALYQi2vZAWIrcaxWO7qCW3k9Xn6R
+// # eas init --id 0c365bb6-fc28-45bd-a77b-f62feb5afe5b
+
+
+
