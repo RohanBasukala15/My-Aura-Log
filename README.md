@@ -1,5 +1,5 @@
 
-# Bravo React Native Project
+# React Native Project
 
 <Add project description>.
 
