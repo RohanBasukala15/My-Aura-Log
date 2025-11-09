@@ -37,7 +37,6 @@ const usePromiseAll = (
       try {
         await Promise.all(unsafePromises);
       } catch (e) {
-        __DEV__ && console.log("LoadAssets, error: ", e);
         // do nothing
       }
       callback();

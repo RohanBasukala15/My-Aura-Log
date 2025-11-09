@@ -4,6 +4,8 @@ import { Provider } from "react-redux";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
 import { Alert, BackHandler } from "react-native";
+import * as Notifications from "expo-notifications";
+import { PaymentService } from "@common/services/paymentService";
 
 import {
   AppConfiguration,
@@ -19,6 +21,17 @@ import { useAppDispatch, useAppSelector } from "@common/redux";
 import { loadConfiguration } from "@common/redux/slices/appConfiguration/app-configuration.action";
 
 SplashScreen.preventAutoHideAsync();
+
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const NavigatorLayout = React.memo(function NavigatorLayout() {
   const screenOptions = useScreenOptions();
@@ -45,6 +58,13 @@ function ConfigurationState() {
 }
 
 export default function Root() {
+  // Initialize RevenueCat payment service
+  useEffect(() => {
+    PaymentService.initialize().catch(() => {
+      // Don't block app startup if payment service fails
+    });
+  }, []);
+
   // disabled android gesture
   useEffect(() => {
     const backAction = () => {
@@ -59,8 +79,7 @@ export default function Root() {
         <AppConfigurationProvider
           prepareConfiguration={() => {
             // TODO: initiate cache loading work like redux loadConfiguration (assign country)
-          }}
-        >
+          }}>
           <Provider store={store}>
             <ConfigurationState />
             <AppConfiguration assets={[]}>
@@ -73,3 +92,4 @@ export default function Root() {
     </GestureHandlerRootView>
   );
 }
+

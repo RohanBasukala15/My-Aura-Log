@@ -2,7 +2,7 @@
   "cli": {
     "version": ">= 3.13.1",
     "promptToConfigurePushNotifications": false,
-    "appVersionSource": "local" //will change to remote when updating the app to the stores
+    "appVersionSource": "local"
   },
   "build": {
     "base": {

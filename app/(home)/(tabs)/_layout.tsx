@@ -1,0 +1,70 @@
+import React from "react";
+import { Tabs } from "expo-router";
+import { MaterialIcons } from "@expo/vector-icons";
+
+import { AppFonts, useTheme } from "@common/components";
+
+function BottomTab() {
+  const theme = useTheme();
+
+  const screenOptions = {
+    headerShown: false,
+    tabBarStyle: {
+      elevation: 0,
+      borderTopWidth: 0,
+      backgroundColor: theme.colors.white,
+    },
+    tabBarLabelStyle: {
+      fontSize: 12,
+      fontStyle: "normal" as const,
+      fontFamily: AppFonts.Regular_400,
+    },
+    tabBarShowLabel: true,
+    tabBarActiveTintColor: theme.colors.primary,
+    tabBarInactiveTintColor: theme.colors.iconsDisabled,
+  };
+
+  return (
+    <Tabs screenOptions={screenOptions}>
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: "Journal",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="edit-note" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: "History",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="history" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="trends"
+        options={{
+          title: "Trends",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="insights" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="settings" size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}
+
+export default BottomTab;
+

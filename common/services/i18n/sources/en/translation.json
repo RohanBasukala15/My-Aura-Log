@@ -1,18 +1,18 @@
 {
-  "app_name": "Bravo Sample",
+  "app_name": "app Sample",
   "screens": {
     "onboarding": {
       "titles": {
-        "page_1": "Welcome to Bravo!",
-        "page_2": "Discover Bravo’s Offerings",
+        "page_1": "Welcome to app!",
+        "page_2": "Discover app Offerings",
         "page_3": "Join us",
         "page_4": "Let's Get Started!"
       },
       "messages": {
         "page_1": "Explore our unique solutions tailored just for you",
         "page_2": "Experience intuitive and seamless usability",
-        "page_3": "Join us and be part of the Bravo family today",
-        "page_4": "Start your journey with Bravo"
+        "page_3": "Join us and be part of the app family today",
+        "page_4": "Start your journey with app"
       },
       "labels": {
         "skip": "Skip"
@@ -45,7 +45,7 @@
     },
     "login": {
       "titles": {
-        "welcome_text": "Hi, Welcome to Bravo Sample App"
+        "welcome_text": "Hi, Welcome to app Sample App"
       },
       "labels": {
         "email": "Email",

@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { configureStore, Middleware, ReducersMapObject } from "@reduxjs/toolkit";
+import { configureStore, Middleware, AnyAction } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
@@ -15,9 +15,9 @@ if (__DEV__ && !process.env.JEST_WORKER_ID && Constants.appOwnership !== "expo")
   setupMockApi();
 }
 
-const resetStateMiddleware: Middleware = (api) => (next) => async (action) => {
+const resetStateMiddleware: Middleware = (api) => (next) => (action) => {
   const response = next(action);
-  if (action.type === "user/signout/fulfilled") {
+  if ((action as AnyAction).type === "user/signout/fulfilled") {
     resetState(api.dispatch);
   }
   return response;

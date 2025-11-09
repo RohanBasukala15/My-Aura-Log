@@ -12,7 +12,8 @@ const LanguageDetector: LanguageDetectorAsyncModule = {
   },
   detect: (callback) => {
     Storage.getItem<string>(AppConstants.StorageKey.appLanguage).then((locale) => {
-      callback(locale ?? Localization.getLocales()?.[0]?.languageCode);
+      const fallbackLocale = Localization.getLocales()?.[0]?.languageCode;
+      callback(locale ?? fallbackLocale ?? "en");
     });
   },
   cacheUserLanguage: (lng) => {

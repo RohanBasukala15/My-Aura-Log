@@ -1,4 +1,5 @@
 const path = require("path");
+const withNotificationColorOverride = require("./plugins/withNotificationColorOverride");
 require("dotenv").config({
   path: path.resolve(__dirname, process.env.NODE_ENV ? `.env.${process.env.NODE_ENV}` : ".env"),
 });
@@ -64,18 +65,49 @@ const usesCleartextTraffic = process.env.EXPO_PUBLIC_apiEndpoint?.startsWith("ht
 
 module.exports = ({ config }) => {
   const overridesConfig = {
+    name: "My Aura Log",
+    slug: "myauralog",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "automatic",
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#E8D5FF",
+    },
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.myauralog.app",
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#E8D5FF",
+      },
+      package: "com.myauralog",
+    },
     plugins: [
       ["expo-build-properties", { android: { usesCleartextTraffic } }],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/icon.png",
+          color: "#9B87F5",
+          sounds: [],
+        },
+      ],
+      withNotificationColorOverride,
     ],
     updates: {
       fallbackToCacheTimeout: 1200,
       url: "https://u.expo.dev/489d329b-044e-4fef-be78-43dd072cd456",
     },
-    owner: "studio_bravo",
-    extra: {
-      eas: {
-        projectId: "489d329b-044e-4fef-be78-43dd072cd456",
-      },
+    owner: "rohanbasukala15",
+    "extra": {
+      "eas": {
+        "projectId": "90b03824-3a3e-4ee2-a500-68b936989cb3"
+      }
     },
     runtimeVersion: {
       policy: "appVersion"

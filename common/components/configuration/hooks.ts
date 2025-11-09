@@ -25,7 +25,6 @@ export const useScreenOptions = <T extends NavigatorType = "Stack">(): ScreenOpt
       fontFamily: "HankenGrotesk_500Medium",
     },
     headerTitleAlign: "center",
-    headerBackTitleVisible: false,
     headerBackButtonMenuEnabled: false,
     headerTintColor: theme.colors.white,
     animation: "slide_from_right",

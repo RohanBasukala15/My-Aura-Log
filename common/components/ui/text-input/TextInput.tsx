@@ -78,7 +78,7 @@ function focusState(focused: boolean, error?: string): number {
 class TextInput extends React.PureComponent<TextInputProps, TextInputState> {
   private mounted: boolean;
 
-  private readonly input: React.RefObject<RNTextInput>;
+  private readonly input: React.RefObject<RNTextInput | null>;
 
   static defaultProps = {
     label: undefined,
@@ -121,7 +121,7 @@ class TextInput extends React.PureComponent<TextInputProps, TextInputState> {
     this.onFocusAnimationEnd = this.onFocusAnimationEnd.bind(this);
 
     this.mounted = false;
-    this.input = React.createRef();
+    this.input = React.createRef<RNTextInput>();
     this.state = {
       focused: false,
       error: props.error,
@@ -503,8 +503,7 @@ class TextInput extends React.PureComponent<TextInputProps, TextInputState> {
         </Box>
         <Animated.View
           style={[inputContainerStyleDelicate, inputContainerStyle, baseContainerStyleOverrides]}
-          {...pressableContainerProps}
-        >
+          {...pressableContainerProps}>
           <Box flex={0} paddingStart="xs" paddingEnd="xxs" justifyContent="center">
             {this.renderPrefix(theme)}
           </Box>
@@ -537,8 +536,9 @@ class TextInput extends React.PureComponent<TextInputProps, TextInputState> {
   }
 
   render() {
-    return <ThemeConsumer>{(theme) => this.renderContent(theme as Theme)}</ThemeConsumer>;
+    return <ThemeConsumer>{theme => this.renderContent(theme as Theme)}</ThemeConsumer>;
   }
 }
 
 export { TextInput };
+

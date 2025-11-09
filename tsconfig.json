@@ -1,14 +1,25 @@
 {
   "compilerOptions": {
+    "jsx": "react",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
     "baseUrl": "./",
     "paths": {
-      "@app": ["@app/index"],
-      "@app/*": ["@app/*/index", "@app/*"],
-      "@common": ["common/index"],
-      "@common/*": ["common/*/index", "common/*"]
+      "@app": [
+        "@app/index"
+      ],
+      "@app/*": [
+        "@app/*/index",
+        "@app/*"
+      ],
+      "@common": [
+        "common/index"
+      ],
+      "@common/*": [
+        "common/*/index",
+        "common/*"
+      ]
     }
   },
   "extends": "expo/tsconfig.base",
@@ -19,5 +30,9 @@
     "metro.transformer.js",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "functions"
   ]
 }

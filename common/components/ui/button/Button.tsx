@@ -1,6 +1,6 @@
 import React, { ForwardedRef, useMemo } from "react";
-import { StyleProp, ColorValue, TextStyle, ActivityIndicator, StyleSheet } from "react-native";
-import { RectButton, RectButtonProperties } from "react-native-gesture-handler";
+import { StyleProp, ColorValue, TextStyle, ActivityIndicator, StyleSheet, ViewStyle } from "react-native";
+import { RectButton, RectButtonProps } from "react-native-gesture-handler";
 import {
   layout,
   border,
@@ -43,33 +43,33 @@ export type ButtonProps = {
   variant?: ButtonVariant;
   labelProps?: TextProps<Theme>;
   labelStyle?: StyleProp<TextStyle>;
-  containerStyle?: StyleProp<TextStyle>;
-  style?: RectButtonProperties["style"];
+  containerStyle?: StyleProp<ViewStyle>;
+  style?: RectButtonProps["style"];
   labelVariant?: React.ComponentProps<typeof Text>["variant"];
   labelColor?: React.ComponentProps<typeof Text>["color"];
 } & ThemeProps;
 
 const ButtonDelicate = React.forwardRef(function ButtonDelicate(
   {
-    dense,
+    dense = false,
     label,
     style,
     prefix,
     suffix,
     onPress,
-    loading,
-    disabled,
-    depressed,
+    loading = false,
+    disabled = false,
+    depressed = false,
     labelColor,
     size = "large",
     variant = "outline",
     labelVariant = "button",
-    labelStyle: labelStyleDelicate,
-    containerStyle: containerStyleDelicate,
+    labelStyle: labelStyleDelicate = undefined,
+    containerStyle: containerStyleDelicate = undefined,
     labelProps = {},
     ...rest
   }: ButtonProps,
-  ref: ForwardedRef<RectButton>
+  ref: ForwardedRef<React.ComponentRef<typeof RectButton>>
 ) {
   const { colors, sizeVariant } = useTheme();
   const reStyle = useRestyle(restyleFunctions, rest);
@@ -126,14 +126,12 @@ const ButtonDelicate = React.forwardRef(function ButtonDelicate(
           coreStyles.container,
           dense ? { paddingHorizontal: 0, marginHorizontal: 0 } : {},
           containerStyleDelicate,
-        ]}
-      >
+        ]}>
         <Box
           flexDirection="row"
           alignItems="center"
           justifyContent="space-between"
-          paddingHorizontal={dense ? undefined : "xs"}
-        >
+          paddingHorizontal={dense ? undefined : "xs"}>
           {(prefix || suffix) && (
             <Box width={containerSize.height ?? 20} justifyContent="center" alignItems="center">
               {typeof prefix === "function" ? prefix(affixProps) : prefix}
@@ -150,8 +148,7 @@ const ButtonDelicate = React.forwardRef(function ButtonDelicate(
               alignItems="center"
               visible={!loading}
               justifyContent="center"
-              minWidth={dense ? undefined : 50}
-            >
+              minWidth={dense ? undefined : 50}>
               <Text
                 variant={labelVariant}
                 style={[
@@ -159,8 +156,7 @@ const ButtonDelicate = React.forwardRef(function ButtonDelicate(
                   { color: colors[labelColor as keyof typeof colors] ?? labelStyle.color },
                   labelStyleDelicate,
                 ]}
-                {...labelProps}
-              >
+                {...labelProps}>
                 {label}
               </Text>
             </Box>
@@ -176,24 +172,7 @@ const ButtonDelicate = React.forwardRef(function ButtonDelicate(
   );
 });
 
-ButtonDelicate.defaultProps = {
-  dense: false,
-  style: undefined,
-  prefix: undefined,
-  suffix: undefined,
-  labelProps: undefined,
-  labelStyle: undefined,
-  containerStyle: undefined,
-  loading: undefined,
-  disabled: undefined,
-  depressed: undefined,
-  onPress: undefined,
-  variant: "outline",
-  size: "large",
-  labelVariant: "button",
-  labelColor: undefined,
-};
-
 const Button = React.memo(ButtonDelicate);
 
 export { Button };
+

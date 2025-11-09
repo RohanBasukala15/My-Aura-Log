@@ -8,7 +8,7 @@ export async function getDeviceId(): Promise<string> {
   let deviceId;
 
   if (Platform.OS === "android") {
-    deviceId = Application.androidId;
+    deviceId = Application.getAndroidId?.();
   }
 
   if (!deviceId) {
