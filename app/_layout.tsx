@@ -60,8 +60,7 @@ function ConfigurationState() {
 export default function Root() {
   // Initialize RevenueCat payment service
   useEffect(() => {
-    PaymentService.initialize().catch(error => {
-      console.warn("Failed to initialize payment service:", error);
+    PaymentService.initialize().catch(() => {
       // Don't block app startup if payment service fails
     });
   }, []);

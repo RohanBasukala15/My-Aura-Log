@@ -2,7 +2,7 @@ import { Storage } from "./Storage";
 
 const PREMIUM_STATUS_KEY = "myauralog_premium_status";
 const DAILY_AI_USAGE_KEY = "myauralog_daily_ai_usage";
-const FREE_AI_LIMIT_PER_DAY = 3;
+const FREE_AI_LIMIT_PER_DAY = 5;
 
 interface DailyUsage {
     date: string; // YYYY-MM-DD format

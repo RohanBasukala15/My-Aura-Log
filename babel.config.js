@@ -6,10 +6,12 @@ module.exports = function (api) {
       [
         "module-resolver",
         {
+          root: ["./"],
           extensions: [".ts", ".tsx", ".ttf"],
           alias: {
             "@app": "./@app",
             "@common": "./common",
+            axios: "./node_modules/axios/dist/browser/axios.cjs"
           },
         },
       ],

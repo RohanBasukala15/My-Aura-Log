@@ -23,7 +23,7 @@ function Trends() {
       setEntries(allEntries);
       processChartData(allEntries);
     } catch (error) {
-      console.error("Error loading entries:", error);
+      // Silently fail
     }
   };
 

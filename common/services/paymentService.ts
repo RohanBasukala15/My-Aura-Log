@@ -28,22 +28,14 @@ export class PaymentService {
         }
 
         if (!REVENUECAT_API_KEY) {
-            console.warn('RevenueCat API key not found. Payment features will be disabled.');
-            console.warn('Please add EXPO_PUBLIC_REVENUECAT_API_KEY to your .env file');
             return false;
         }
 
         try {
             await Purchases.configure({ apiKey: REVENUECAT_API_KEY });
             this.isInitialized = true;
-            console.log('RevenueCat initialized successfully');
-
-            // Set user identifier (optional - can use device ID or user ID)
-            // await Purchases.logIn('user_id_here');
-
             return true;
         } catch (error) {
-            console.error('Error initializing RevenueCat:', error);
             return false;
         }
     }
@@ -80,14 +72,11 @@ export class PaymentService {
             // If not found by identifier, use the first available package
             if (!premiumPackage && offerings.current.availablePackages.length > 0) {
                 premiumPackage = offerings.current.availablePackages[0];
-                console.warn(`Package with ID "${PRODUCT_ID}" not found. Using first available package: ${premiumPackage.identifier}`);
             }
 
             if (!premiumPackage) {
                 throw new Error('No packages available. Please configure products in RevenueCat.');
             }
-
-            console.log(`Purchasing package: ${premiumPackage.identifier}`);
 
             // Purchase the package
             const { customerInfo } = await Purchases.purchasePackage(premiumPackage);
@@ -100,7 +89,6 @@ export class PaymentService {
 
             if (hasEntitlement || hasProduct) {
                 await PremiumService.setPremiumStatus(true);
-                console.log('Premium purchase successful');
                 return true;
             }
 
@@ -108,15 +96,11 @@ export class PaymentService {
             const purchaseDate = customerInfo.allPurchaseDates[PRODUCT_ID];
             if (purchaseDate) {
                 await PremiumService.setPremiumStatus(true);
-                console.log('Premium purchase successful (by product ID)');
                 return true;
             }
 
-            console.warn('Purchase completed but premium status not found');
             return false;
         } catch (error: any) {
-            console.error('Purchase error:', error);
-
             // Handle user cancellation
             if (error.userCancelled) {
                 throw new Error('Purchase cancelled');
@@ -150,13 +134,11 @@ export class PaymentService {
 
             if (hasEntitlement || hasProduct) {
                 await PremiumService.setPremiumStatus(true);
-                console.log('Purchases restored successfully');
                 return true;
             }
 
             return false;
         } catch (error: any) {
-            console.error('Restore error:', error);
             throw new Error(error.message || 'Failed to restore purchases. Please try again.');
         }
     }
@@ -184,7 +166,6 @@ export class PaymentService {
 
             return isPremium;
         } catch (error) {
-            console.error('Error checking premium status:', error);
             return false;
         }
     }
@@ -202,7 +183,6 @@ export class PaymentService {
             const offerings = await Purchases.getOfferings();
             return offerings.current?.availablePackages || [];
         } catch (error) {
-            console.error('Error getting packages:', error);
             return [];
         }
     }

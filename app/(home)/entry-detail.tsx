@@ -37,7 +37,6 @@ function EntryDetail() {
         router.back();
       }
     } catch (error) {
-      console.error("Error loading entry:", error);
       Toast.show({
         type: "error",
         text1: "Failed to load entry",

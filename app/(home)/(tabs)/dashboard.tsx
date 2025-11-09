@@ -21,6 +21,21 @@ import { PremiumService } from "@common/services/premiumService";
 import { useAppDispatch, useAppSelector } from "@common/redux";
 import { setUpgradeAlertShown, checkUpgradeAlertStatus } from "@common/redux/slices/premium/premium.slice";
 
+import dashboardCopy from "./dashboardCopy.json";
+
+const copyContent = dashboardCopy as {
+  headerTitles: string[];
+  headerSubtitles: string[];
+};
+
+const pickRandom = (options: string[], fallback: string): string => {
+  if (!Array.isArray(options) || options.length === 0) {
+    return fallback;
+  }
+  const index = Math.floor(Math.random() * options.length);
+  return options[index] ?? fallback;
+};
+
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 function Dashboard() {
@@ -35,6 +50,12 @@ function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [remainingAI, setRemainingAI] = useState<number>(-1);
   const [isPremium, setIsPremium] = useState(false);
+  const [headerTitle] = useState(() =>
+    pickRandom(copyContent.headerTitles, "How are you feeling today?")
+  );
+  const [headerSubtitle] = useState(() =>
+    pickRandom(copyContent.headerSubtitles, "Take a moment to reflect on your day")
+  );
 
   const availableTags = ["work", "health", "family", "relationships", "personal", "other"];
 
@@ -67,16 +88,16 @@ function Dashboard() {
   const showUpgradeAlert = (): Promise<boolean> => {
     return new Promise(resolve => {
       Alert.alert(
-        "Upgrade to Premium ☕",
-        "To analyze with AI (as it costs money), buy me a cup of coffee ($5) to get premium tier for unlimited analyze.",
+        "Treat Yourself to Premium ☕",
+        "Unlimited AI reflections stay brewing with a one-time $5 thank-you. Unlock premium to keep the insights flowing all day.",
         [
           {
-            text: "Skip",
+            text: "Maybe later",
             style: "cancel",
             onPress: () => resolve(false),
           },
           {
-            text: "Buy Premium",
+            text: "Unlock Premium",
             style: "default",
             onPress: () => {
               resolve(true);
@@ -93,7 +114,7 @@ function Dashboard() {
     if (!selectedMood) {
       Toast.show({
         type: "error",
-        text1: "Please select a mood",
+        text1: "Pick a mood to match your moment.",
       });
       return;
     }
@@ -101,7 +122,7 @@ function Dashboard() {
     if (!journalText.trim()) {
       Toast.show({
         type: "error",
-        text1: "Please write something",
+        text1: "Add a few words about your day.",
       });
       return;
     }
@@ -141,8 +162,8 @@ function Dashboard() {
         } catch (error) {
           Toast.show({
             type: "warning",
-            text1: "AI analysis failed",
-            text2: "Entry saved without AI insights",
+            text1: "AI insight took a rain check",
+            text2: "Saved your entry without the extra sparkle.",
           });
         }
       }
@@ -165,12 +186,14 @@ function Dashboard() {
       if (shouldAnalyze) {
         Toast.show({
           type: "success",
-          text1: "Your reflection has been recorded with AI insights",
+          text1: "Reflection saved with AI sparkle",
+          text2: "Head to your entry for the full breakdown.",
         });
       } else {
         Toast.show({
           type: "success",
-          text1: "Your reflection has been recorded",
+          text1: "Reflection saved",
+          text2: "Thanks for checking in today.",
         });
       }
 
@@ -182,11 +205,10 @@ function Dashboard() {
       // Navigate to entry detail screen to show full entry and AI insights
       router.push(`/(home)/entry-detail?id=${entry.id}`);
     } catch (error) {
-      console.error("Error saving entry:", error);
       Toast.show({
         type: "error",
-        text1: "Failed to save entry",
-        text2: "Please try again",
+        text1: "We couldn't save your reflection",
+        text2: "Please try again in a moment.",
       });
     } finally {
       setIsLoading(false);
@@ -208,10 +230,10 @@ function Dashboard() {
           {/* Header Section */}
           <Box marginBottom="xl">
             <Text variant="default" marginBottom="xs" textAlign={"center"} color="textDefault" style={styles.mainTitle}>
-              How are you feeling today?
+              {headerTitle}
             </Text>
             <Text variant="default" color="black" textAlign={"center"}>
-              Take a moment to reflect on your day
+              {headerSubtitle}
             </Text>
           </Box>
 
@@ -415,7 +437,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   moodEmojiUnselected: {
-    fontSize: 16,
+    fontSize: 24,
   },
   // Text Input Styles
   textInputContainer: {

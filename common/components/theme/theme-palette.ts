@@ -219,6 +219,12 @@ const lightTheme = createTheme({
       fontStyle: "normal",
       fontFamily: "HankenGrotesk_400Regular",
     },
+    defaults: {
+      fontSize: 18,
+      fontWeight: "400",
+      fontStyle: "normal",
+      fontFamily: "HankenGrotesk_400Regular",
+    },
   },
   toastVariant: {
     defaults: {

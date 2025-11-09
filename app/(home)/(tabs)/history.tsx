@@ -19,7 +19,6 @@ function History() {
       const allEntries = await JournalStorage.getAllEntries();
       setEntries(allEntries);
     } catch (error) {
-      console.error("Error loading entries:", error);
       Toast.show({
         type: "error",
         text1: "Failed to load entries",

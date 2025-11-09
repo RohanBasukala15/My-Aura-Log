@@ -71,7 +71,6 @@ export class ReferralService {
                 }
             } catch (error) {
                 // If Firebase fails, just use the generated code
-                console.warn('Firebase check failed, using generated code:', error);
             }
         }
 
@@ -132,10 +131,8 @@ export class ReferralService {
                     createdAt: new Date().toISOString(),
                 });
 
-                console.log(`✅ New referral code assigned to device ${deviceId}: ${code}`);
                 return code;
             } catch (error) {
-                console.error('Firebase error in getMyReferralCode:', error);
                 // If Firebase fails, fall back to local storage
             }
         }
@@ -183,7 +180,6 @@ export class ReferralService {
                     return count;
                 }
             } catch (error) {
-                console.error('Firebase error in getReferralCount:', error);
                 // Fall through to local storage
             }
         }
@@ -213,7 +209,6 @@ export class ReferralService {
                     return referredBy;
                 }
             } catch (error) {
-                console.error('Firebase error in getReferredBy:', error);
                 // Fall through to local storage
             }
         }
@@ -358,7 +353,6 @@ export class ReferralService {
                     message: "Referral code applied successfully!",
                 };
             } catch (error: any) {
-                console.error('Firebase error in enterReferralCode:', error);
                 // Fall through to local storage
             }
         }
@@ -441,7 +435,6 @@ export class ReferralService {
                     }
                 }
             } catch (error) {
-                console.error('Firebase error in hasEarnedPremiumViaReferrals:', error);
                 // Fall through to local check
             }
         }

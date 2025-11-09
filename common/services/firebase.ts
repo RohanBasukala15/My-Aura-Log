@@ -28,8 +28,6 @@ try {
     initializeApp = firebaseApp.initializeApp;
     getFirestore = firestore.getFirestore;
 } catch (error) {
-    console.warn('Firebase not installed. Run: npm install firebase');
-    console.warn('This works on Android and iOS with Expo!');
     // Functions will be null if Firebase is not installed
 }
 
@@ -60,19 +58,9 @@ if (isFirebaseConfigured && initializeApp && getFirestore) {
     try {
         app = initializeApp(firebaseConfig);
         db = getFirestore(app);
-        console.log('✅ Firebase initialized successfully');
     } catch (error) {
-        console.error('❌ Firebase initialization error:', error);
-        console.warn('   Make sure Firebase is installed: npm install firebase');
         app = null;
         db = null;
-    }
-} else {
-    if (!initializeApp || !getFirestore) {
-        console.warn('⚠️ Firebase package not installed. Run: npm install firebase');
-    } else {
-        console.warn('⚠️ Firebase not configured. Using local storage only.');
-        console.warn('   To enable Firebase, add your config to firebase.ts or .env file');
     }
 }
 

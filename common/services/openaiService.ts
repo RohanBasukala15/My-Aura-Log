@@ -67,7 +67,6 @@ Return JSON:
             const insight = JSON.parse(cleanedContent) as AIInsight;
             return insight;
         } catch (error) {
-            console.error("OpenAI API Error:", error);
             // Return fallback insight
             return {
                 emotion: "calm",
