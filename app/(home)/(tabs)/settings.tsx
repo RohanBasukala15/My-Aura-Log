@@ -544,6 +544,67 @@ function Settings() {
         <DangerZoneSection onClearData={handleClearData} />
 
         <LegalSection appVersion="1.0.0" />
+
+        {/* Contact Section */}
+        <Box
+          backgroundColor="white"
+          borderRadius="l"
+          padding="m"
+          marginTop="m"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 2,
+          }}>
+          <Text variant="h3" marginBottom="xs" color="textDefault">
+            We'd Love to Hear From You 💌
+          </Text>
+          <Text variant="default" marginBottom="m" color="textSubdued">
+            Questions, ideas, or just want to share your thoughts? We're all ears.
+          </Text>
+          <TouchableOpacity
+            onPress={async () => {
+              const email = "myauralog@gmail.com";
+              const subject = encodeURIComponent("My Aura Log Feedback");
+              const body = encodeURIComponent(
+                "Hi My Aura Log team,\n\nI wanted to reach out about...\n\n"
+              );
+              const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
+
+              try {
+                const canOpen = await Linking.canOpenURL(mailtoUrl);
+                if (canOpen) {
+                  await Linking.openURL(mailtoUrl);
+                } else {
+                  Toast.show({
+                    type: "info",
+                    text1: "No email app found",
+                    text2: "Please email us at myauralog@gmail.com",
+                  });
+                }
+              } catch (error) {
+                Toast.show({
+                  type: "error",
+                  text1: "Couldn't open email",
+                  text2: "Please email us at myauralog@gmail.com",
+                });
+              }
+            }}
+            style={{
+              backgroundColor: "#9B87F5",
+              paddingVertical: 14,
+              paddingHorizontal: 20,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+            <Text variant="button" style={{ color: "#FFFFFF", fontWeight: "600" }}>
+              Send Us a Message
+            </Text>
+          </TouchableOpacity>
+        </Box>
       </Box>
 
       {Platform.OS === "ios" && (

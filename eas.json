@@ -46,10 +46,18 @@
       "autoIncrement": true,
       "distribution": "store",
       "android": {
-        "buildType": "apk"
+        "buildType": "aab"
       },
       "ios": {
         "resourceClass": "m-medium"
+      }
+    },
+    "production-apk": {
+      "extends": "base",
+      "autoIncrement": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     }
   },
