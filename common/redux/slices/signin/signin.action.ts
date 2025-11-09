@@ -11,8 +11,6 @@ import { Storage } from "@common/services/Storage";
 import { EncryptedStorage } from "@common/services/EncryptedStorage";
 
 export const signIn = createAsyncThunk<SignInResponse, SignInPayload>("signIn/signInApi", async (payload, api) => {
-  console.log("payloadpayloadpayloadpayload", payload);
-
   const reqObj = {
     username: payload.email,
     password: payload.password,
@@ -55,6 +53,5 @@ export const signIn = createAsyncThunk<SignInResponse, SignInPayload>("signIn/si
     api.dispatch(appConfigurationSlice.actions.setRememberUser());
   }
 
-  console.log("response.data.data", response.data.data);
   return response.data.data;
 });

@@ -11,7 +11,6 @@ interface MockAdapterOptions {
 export default function mockApi(options: MockAdapterOptions = { delayResponse: 1000 }) {
   const authApiMock = new MockAdapter(AuthApi, options);
   const apiMock = new MockAdapter(Api, options);
-  console.log("authApiMock", authApiMock);
   authApiMock.onPost(AppConstants.ApiKeys.logout).reply(() => [200, { message: "Logout completed!" }]);
 
   authApiMock.onPost(AppConstants.ApiKeys.signIn).reply(() => [

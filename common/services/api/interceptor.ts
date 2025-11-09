@@ -15,8 +15,6 @@ async function responseInterceptor(
 ) {
   const originalRequest = error.request;
 
-  console.log("Original Request", originalRequest);
-
   if (error.response?.status === StatusCode.FORBIDDEN && !originalRequest?.retry) {
     originalRequest.retry = true;
     const session = await EncryptedStorage.getItem<AppSession>(AppConstants.StorageKey.appSession);
@@ -35,7 +33,6 @@ async function responseInterceptor(
 }
 
 async function requestInterceptor<I>(config: InternalAxiosRequestConfig<I>) {
-  console.log("Config in requestInterceptor", config);
   const session = await EncryptedStorage.getItem<AppSession>(AppConstants.StorageKey.appSession);
 
   if (session && !TokenUtils.isTokenExpired(session?.access_token)) {
