@@ -14,6 +14,12 @@
             padding: 20px;
             background: #f8f6ff;
         }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
         h1 {
             color: #9B87F5;
             border-bottom: 3px solid #7DD3C0;
@@ -29,11 +35,8 @@
         a {
             color: #9B87F5;
         }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        ul {
+            margin: 10px 0;
         }
         .last-updated {
             color: #666;
@@ -45,7 +48,7 @@
 <body>
     <div class="container">
         <h1>Privacy Policy for My Aura Log</h1>
-        <p class="last-updated"><strong>Last Updated:</strong> [Insert Date]</p>
+        <p class="last-updated"><strong>Last Updated:</strong> November 2024</p>
 
         <h2>Introduction</h2>
         <p>My Aura Log ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application.</p>
@@ -56,7 +59,7 @@
         <ul>
             <li><strong>Journal Entries:</strong> The thoughts, moods, and emotions you record in the app</li>
             <li><strong>Mood Data:</strong> Your mood selections and emotional state tracking</li>
-            <li><strong>Device Information:</strong> Device ID for referral tracking and app functionality</li>
+            <li><strong>Device Information:</strong> Device ID for app functionality</li>
         </ul>
 
         <h3>Automatically Collected Information</h3>
@@ -72,7 +75,6 @@
             <li>Provide AI-powered insights on your journal entries (via OpenAI)</li>
             <li>Track your mood patterns and trends</li>
             <li>Process premium purchases (via RevenueCat)</li>
-            <li>Manage referral rewards (via Firebase)</li>
             <li>Improve app functionality and user experience</li>
             <li>Send you notifications (if enabled)</li>
         </ul>
@@ -80,7 +82,7 @@
         <h2>Data Storage</h2>
         <ul>
             <li><strong>Local Storage:</strong> Journal entries are stored locally on your device</li>
-            <li><strong>Cloud Storage:</strong> Referral data is stored in Firebase (encrypted)</li>
+            <li><strong>Cloud Storage:</strong> Optional backup using Firebase (encrypted)</li>
             <li><strong>AI Processing:</strong> Journal text is sent to OpenAI for analysis (not stored permanently)</li>
         </ul>
 
@@ -91,21 +93,21 @@
         <ul>
             <li><strong>Purpose:</strong> Generate AI insights from your journal entries</li>
             <li><strong>Data Shared:</strong> Journal text content</li>
-            <li><strong>Privacy Policy:</strong> <a href="https://openai.com/policies/privacy-policy">https://openai.com/policies/privacy-policy</a></li>
+            <li><strong>Privacy Policy:</strong> <a href="https://openai.com/policies/privacy-policy" target="_blank">https://openai.com/policies/privacy-policy</a></li>
         </ul>
 
         <h3>RevenueCat</h3>
         <ul>
             <li><strong>Purpose:</strong> Process in-app purchases</li>
             <li><strong>Data Shared:</strong> Purchase transactions, device ID</li>
-            <li><strong>Privacy Policy:</strong> <a href="https://www.revenuecat.com/privacy">https://www.revenuecat.com/privacy</a></li>
+            <li><strong>Privacy Policy:</strong> <a href="https://www.revenuecat.com/privacy" target="_blank">https://www.revenuecat.com/privacy</a></li>
         </ul>
 
         <h3>Firebase (Google)</h3>
         <ul>
-            <li><strong>Purpose:</strong> Referral tracking and cloud data storage</li>
-            <li><strong>Data Shared:</strong> Device ID, referral codes, referral counts</li>
-            <li><strong>Privacy Policy:</strong> <a href="https://firebase.google.com/support/privacy">https://firebase.google.com/support/privacy</a></li>
+            <li><strong>Purpose:</strong> Cloud storage and analytics</li>
+            <li><strong>Data Shared:</strong> Device ID, usage analytics</li>
+            <li><strong>Privacy Policy:</strong> <a href="https://firebase.google.com/support/privacy" target="_blank">https://firebase.google.com/support/privacy</a></li>
         </ul>
 
         <h2>Data Security</h2>
@@ -128,7 +130,7 @@
 
         <h3>How to Exercise Your Rights</h3>
         <ul>
-            <li><strong>Delete All Data:</strong> Use the "Clear All Data" option in Settings → Danger Zone</li>
+            <li><strong>Delete All Data:</strong> Use the "Clear All Data" option in Settings</li>
             <li><strong>Disable AI:</strong> Simply save entries without AI analysis</li>
             <li><strong>Disable Notifications:</strong> Toggle off in Settings</li>
         </ul>
@@ -139,7 +141,7 @@
         <h2>Data Retention</h2>
         <ul>
             <li><strong>Journal Entries:</strong> Stored locally until you delete them</li>
-            <li><strong>Referral Data:</strong> Stored in Firebase for the lifetime of your account</li>
+            <li><strong>Cloud Backup:</strong> Stored in Firebase for the lifetime of your account (if enabled)</li>
             <li><strong>AI Processing:</strong> Journal text is not stored by OpenAI after processing</li>
         </ul>
 
@@ -147,18 +149,13 @@
         <p>Your data may be processed in the United States or other countries where our service providers operate. By using the app, you consent to this transfer.</p>
 
         <h2>Changes to This Policy</h2>
-        <p>We may update this Privacy Policy from time to time. We will notify you of significant changes via:</p>
-        <ul>
-            <li>In-app notification</li>
-            <li>Email (if provided)</li>
-            <li>Updated "Last Updated" date</li>
-        </ul>
+        <p>We may update this Privacy Policy from time to time. We will notify you of significant changes via in-app notification and updating the "Last Updated" date.</p>
 
         <h2>Contact Us</h2>
         <p>If you have questions about this Privacy Policy, contact us at:</p>
         <ul>
-            <li><strong>Email:</strong> [your-email@example.com]</li>
-            <li><strong>Website:</strong> [your-website.com]</li>
+            <li><strong>Email:</strong> support@myauralog.com</li>
+            <li><strong>GitHub:</strong> <a href="https://github.com/RohanBasukala15/My-Aura-Log" target="_blank">My Aura Log Repository</a></li>
         </ul>
 
         <h2>Your Consent</h2>
@@ -166,12 +163,12 @@
 
         <hr style="margin: 40px 0; border: none; border-top: 1px solid #ddd;">
 
-        <h2>Specific Permissions Requested</h2>
+        <h2>Specific Permissions</h2>
 
         <h3>iOS Permissions</h3>
         <ul>
             <li><strong>Notifications:</strong> To send daily journal reminders (optional)</li>
-            <li><strong>Device Storage:</strong> To save journal entries locally</li>
+            <li><strong>Storage:</strong> To save journal entries locally</li>
         </ul>
 
         <h3>Android Permissions</h3>
@@ -181,7 +178,7 @@
         </ul>
 
         <p style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em;">
-            <strong>Note:</strong> This privacy policy complies with GDPR (General Data Protection Regulation), CCPA (California Consumer Privacy Act), Apple App Store Guidelines, and Google Play Store Guidelines.
+            <strong>Note:</strong> This privacy policy complies with GDPR, CCPA, Apple App Store Guidelines, and Google Play Store Guidelines.
         </p>
     </div>
 </body>
