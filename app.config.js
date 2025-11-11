@@ -73,12 +73,17 @@ module.exports = ({ config }) => {
     userInterfaceStyle: "automatic",
     splash: {
       image: "./assets/splash.png",
-      resizeMode: "contain",
+      resizeMode: "cover",
       backgroundColor: "#E8D5FF",
     },
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
+      splash: {
+        image: "./assets/splash.png",
+        resizeMode: "contain",
+        backgroundColor: "#E8D5FF",
+      },
     },
     android: {
       adaptiveIcon: {
@@ -86,6 +91,16 @@ module.exports = ({ config }) => {
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
+      splash: {
+        image: "./assets/splash.png",
+        resizeMode: "cover",
+        backgroundColor: "#E8D5FF",
+        mdpi: "./assets/splash.png",
+        hdpi: "./assets/splash.png",
+        xhdpi: "./assets/splash.png",
+        xxhdpi: "./assets/splash.png",
+        xxxhdpi: "./assets/splash.png",
+      },
     },
     plugins: [
       ["expo-build-properties", { android: { usesCleartextTraffic } }],
