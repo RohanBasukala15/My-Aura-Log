@@ -73,7 +73,7 @@ module.exports = ({ config }) => {
     userInterfaceStyle: "automatic",
     splash: {
       image: "./assets/splash.png",
-      resizeMode: "contain",
+      resizeMode: "cover",
       backgroundColor: "#E8D5FF",
     },
     ios: {
