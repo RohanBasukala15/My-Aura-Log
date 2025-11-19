@@ -181,7 +181,7 @@ function Breathing() {
   // Calculate progress for the circle (0 to 1)
   useEffect(() => {
     if (isActive && currentPhase) {
-      const phaseDuration = phaseTimings[currentPhase] * 1000; // Convert to ms
+      const phaseDuration = phaseTimings[currentPhase as BreathingPhase] * 1000; // Convert to ms
       const interval = 50; // Update every 50ms
       let elapsed = 0;
 
@@ -265,7 +265,7 @@ function Breathing() {
 
   // Phase cycling logic
   const cyclePhase = useCallback(() => {
-    setCurrentPhase((prev) => {
+    setCurrentPhase((prev: BreathingPhase) => {
       if (prev === "inhale") return "hold";
       if (prev === "hold") return "exhale";
       return "inhale";
@@ -284,7 +284,7 @@ function Breathing() {
 
     phaseTimerRef.current = setTimeout(() => {
       cyclePhase();
-    }, phaseTimings[currentPhase] * 1000);
+    }, phaseTimings[currentPhase as BreathingPhase] * 1000);
 
     return () => {
       if (phaseTimerRef.current) {
@@ -378,7 +378,7 @@ function Breathing() {
     }
 
     timerRef.current = setInterval(() => {
-      setRemainingTime((prev) => {
+      setRemainingTime((prev: number) => {
         if (prev <= 1) {
           handleStop().catch(() => {}); // Handle async without awaiting
           return 0;
@@ -472,9 +472,9 @@ function Breathing() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const currentPhaseColors = PHASE_COLORS[currentPhase];
+  const currentPhaseColors = PHASE_COLORS[currentPhase as BreathingPhase];
 
-  const currentGlowColor = PHASE_GLOW_COLORS[currentPhase];
+  const currentGlowColor = PHASE_GLOW_COLORS[currentPhase as BreathingPhase];
   const glowOpacity = useSharedValue(0.3);
 
   // Animate glow opacity
@@ -598,7 +598,7 @@ function Breathing() {
               <Animated.View style={[styles.circle, animatedCircleStyle]}>
                 <View style={[styles.circleInner, { backgroundColor: currentPhaseColors[0] }]}>
                   <Text variant="h1" textAlign="center" style={styles.phaseLabel}>
-                    {PHASE_LABELS[currentPhase]}
+                    {PHASE_LABELS[currentPhase as BreathingPhase]}
                   </Text>
                   {isActive && (
                     <Text variant="h6" textAlign="center" style={styles.phaseSubtext}>

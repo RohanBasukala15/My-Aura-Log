@@ -74,7 +74,7 @@ export class PaymentService {
 
       // Find package by product identifier (store SKU)
       let premiumPackage: PurchasesPackage | undefined = offerings.current.availablePackages.find(
-        pkg => pkg.product.identifier === PRODUCT_ID
+        (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_ID
       );
 
       // Fallback: use the first available package
@@ -182,7 +182,7 @@ export class PaymentService {
     const productPurchased =
       customerInfo.allPurchaseDates?.[PRODUCT_ID] !== undefined ||
       customerInfo.nonSubscriptionTransactions.some(
-        transaction => transaction.productIdentifier === PRODUCT_ID
+        (transaction: { productIdentifier: string }) => transaction.productIdentifier === PRODUCT_ID
       );
 
     return entitlementActive || productPurchased;

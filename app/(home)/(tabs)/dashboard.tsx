@@ -19,6 +19,7 @@ import { JournalStorage } from "@common/services/journalStorage";
 import { OpenAIService } from "@common/services/openaiService";
 import { PremiumService } from "@common/services/premiumService";
 import { useAppDispatch, useAppSelector } from "@common/redux";
+import type { RootState } from "@common/redux/store";
 import { setUpgradeAlertShown, checkUpgradeAlertStatus } from "@common/redux/slices/premium/premium.slice";
 import { MoodAnalysisService } from "@common/services/moodAnalysisService";
 import { BreathingRecommendation } from "@common/models/BreathingSession";
@@ -45,7 +46,7 @@ function Dashboard() {
   const theme = useTheme();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const upgradeAlertShownToday = useAppSelector(state => state.premium.upgradeAlertShownToday);
+  const upgradeAlertShownToday = useAppSelector((state: RootState) => state.premium.upgradeAlertShownToday);
 
   const [selectedMood, setSelectedMood] = useState<MoodEmoji | null>(null);
   const [journalText, setJournalText] = useState("");
@@ -86,7 +87,7 @@ function Dashboard() {
   );
 
   const toggleTag = (tag: string) => {
-    setSelectedTags(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
+    setSelectedTags((prev: string[]) => (prev.includes(tag) ? prev.filter((t: string) => t !== tag) : [...prev, tag]));
   };
 
   const showUpgradeAlert = (): Promise<boolean> => {
@@ -384,7 +385,7 @@ function Dashboard() {
                   placeholder="What's on your mind today?..."
                   placeholderTextColor="#A7A7A7"
                   value={journalText}
-                  onChangeText={(text) => {
+                  onChangeText={(text: string) => {
                     setJournalText(text);
                     // Analyze in real-time for recommendation (if mood selected)
                     if (selectedMood && text.trim().length > 10) {
