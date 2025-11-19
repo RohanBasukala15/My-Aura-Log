@@ -1,5 +1,6 @@
 import OpenAI from "openai";
-import { AIInsight } from "../models/JournalEntry";
+import { AIInsight, MoodEmoji, MOOD_LABELS } from "../models/JournalEntry";
+import { generateRandomInsight } from "./aiInsightMockData";
 
 // Initialize OpenAI client only if API key is available
 const getOpenAIClient = () => {
@@ -14,31 +15,37 @@ const getOpenAIClient = () => {
 };
 
 export class OpenAIService {
-    static async generateInsight(entryText: string): Promise<AIInsight> {
+    static async generateInsight(
+        entryText: string,
+        mood: MoodEmoji,
+        tags?: string[]
+    ): Promise<AIInsight> {
         const openai = getOpenAIClient();
         if (!openai) {
-            // Return mock data if API key is not set
-            return {
-                emotion: "calm",
-                summary: "A moment of reflection and awareness.",
-                suggestion: "Take a deep breath and acknowledge your feelings.",
-                quote: "Mindfulness is the path to inner peace.",
-            };
+            // Return random mock data if API key is not set
+            return generateRandomInsight(mood, tags);
         }
+
+        const moodLabel = MOOD_LABELS[mood] || mood;
+        const tagsText = tags && tags.length > 0 ? tags.join(", ") : "none";
 
         const prompt = `
 You are My Aura Log, an empathetic AI assistant helping users understand their emotions.
 
-Analyze the following journal entry:
+Analyze the following journal entry with full context:
 
-"${entryText}"
+Mood: ${moodLabel} (${mood})
+Tags: ${tagsText}
+Thoughts: "${entryText}"
+
+Consider the user's selected mood, the tags they've associated with this entry, and their written thoughts to provide a comprehensive and empathetic analysis. The mood reflects how they're feeling, the tags show what areas of life this relates to, and the thoughts contain the details of their experience.
 
 Return JSON:
 {
   "emotion": "Primary emotion (happy, sad, calm, anxious, angry, etc.)",
-  "summary": "Brief compassionate summary (max 20 words)",
-  "suggestion": "Short positive advice (max 25 words)",
-  "quote": "Uplifting quote or thought (max 15 words)"
+  "summary": "Brief compassionate summary that considers their mood, tags, and thoughts (max 35 words)",
+  "suggestion": "Short positive advice tailored to their situation based on mood, tags, and content (max 45 words)",
+  "quote": "Uplifting quote or thought (max 25 words)"
 }
 `;
 
@@ -67,13 +74,8 @@ Return JSON:
             const insight = JSON.parse(cleanedContent) as AIInsight;
             return insight;
         } catch (error) {
-            // Return fallback insight
-            return {
-                emotion: "calm",
-                summary: "Your feelings are valid and acknowledged.",
-                suggestion: "Take time to reflect and be gentle with yourself.",
-                quote: "Every moment is a new beginning.",
-            };
+            // Return random fallback insight if API call fails
+            return generateRandomInsight(mood, tags);
         }
     }
 }

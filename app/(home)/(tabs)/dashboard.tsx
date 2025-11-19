@@ -20,6 +20,9 @@ import { OpenAIService } from "@common/services/openaiService";
 import { PremiumService } from "@common/services/premiumService";
 import { useAppDispatch, useAppSelector } from "@common/redux";
 import { setUpgradeAlertShown, checkUpgradeAlertStatus } from "@common/redux/slices/premium/premium.slice";
+import { MoodAnalysisService } from "@common/services/moodAnalysisService";
+import { BreathingRecommendation } from "@common/models/BreathingSession";
+import { MaterialIcons } from "@expo/vector-icons";
 
 import dashboardCopy from "./dashboardCopy.json";
 
@@ -50,6 +53,7 @@ function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [remainingAI, setRemainingAI] = useState<number>(-1);
   const [isPremium, setIsPremium] = useState(false);
+  const [breathingRecommendation, setBreathingRecommendation] = useState<BreathingRecommendation | null>(null);
   const [headerTitle] = useState(() =>
     pickRandom(copyContent.headerTitles, "How are you feeling today?")
   );
@@ -154,7 +158,11 @@ function Dashboard() {
       // Only generate AI insight if user can use it
       if (shouldAnalyze) {
         try {
-          aiInsight = await OpenAIService.generateInsight(journalText);
+          aiInsight = await OpenAIService.generateInsight(
+            journalText,
+            selectedMood,
+            selectedTags.length > 0 ? selectedTags : undefined
+          );
           // Increment usage count after successful AI generation
           await PremiumService.incrementAIUsage();
           // Reload premium status to update remaining count
@@ -183,6 +191,10 @@ function Dashboard() {
       // Save to storage
       await JournalStorage.saveEntry(entry);
 
+      // Analyze mood and recommend breathing exercise if needed
+      const recommendation = MoodAnalysisService.analyzeEntry(entry);
+      setBreathingRecommendation(recommendation);
+
       if (shouldAnalyze) {
         Toast.show({
           type: "success",
@@ -195,6 +207,47 @@ function Dashboard() {
           text1: "Reflection saved",
           text2: "Thanks for checking in today.",
         });
+      }
+
+      // Show breathing recommendation if suggested
+      if (recommendation.suggested) {
+        // Small delay to let success toast show first
+        setTimeout(() => {
+          Alert.alert(
+            "🧘 Breathing Exercise",
+            recommendation.reason,
+            [
+              {
+                text: "Maybe later",
+                style: "cancel",
+              },
+              {
+                text: "Start Session",
+                style: "default",
+                onPress: () => {
+                  const params: Record<string, string> = {};
+                  if (recommendation.journalEntryId) {
+                    params.journalEntryId = recommendation.journalEntryId;
+                  }
+                  if (recommendation.mood) {
+                    params.mood = recommendation.mood;
+                  }
+                  if (recommendation.emotion) {
+                    params.emotion = recommendation.emotion;
+                  }
+                  if (recommendation.duration) {
+                    params.duration = recommendation.duration.toString();
+                  }
+                  router.push({
+                    pathname: "/(home)/(tabs)/breathing",
+                    params,
+                  });
+                },
+              },
+            ],
+            { cancelable: true }
+          );
+        }, 500);
       }
 
       // Reset form before navigating away
@@ -237,6 +290,51 @@ function Dashboard() {
             </Text>
           </Box>
 
+          {/* Breathing Recommendation Banner (if suggested based on mood/text) */}
+          {breathingRecommendation?.suggested && !isLoading && (
+            <Box marginBottom="m">
+              <TouchableOpacity
+                onPress={() => {
+                  const params: Record<string, string> = {};
+                  if (breathingRecommendation?.journalEntryId) {
+                    params.journalEntryId = breathingRecommendation.journalEntryId;
+                  }
+                  if (breathingRecommendation?.mood) {
+                    params.mood = breathingRecommendation.mood;
+                  }
+                  if (breathingRecommendation?.emotion) {
+                    params.emotion = breathingRecommendation.emotion;
+                  }
+                  if (breathingRecommendation?.duration) {
+                    params.duration = breathingRecommendation.duration.toString();
+                  }
+                  router.push({
+                    pathname: "/(home)/(tabs)/breathing",
+                    params,
+                  });
+                }}
+                activeOpacity={0.8}>
+                <LinearGradient
+                  colors={["#FFF9E6", "#FFF4D6"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.recommendationBanner}>
+                  <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+                    <Box flex={1}>
+                      <Text variant="h6" style={styles.recommendationTitle}>
+                        🧘 Try Breathing Exercise
+                      </Text>
+                      <Text variant="h7" style={styles.recommendationText}>
+                        {breathingRecommendation.reason}
+                      </Text>
+                    </Box>
+                    <MaterialIcons name="arrow-forward" size={20} color="#F1C21B" />
+                  </Box>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Box>
+          )}
+
           {/* Mood Selector - Clean Minimal Design */}
           <Box marginBottom="xl" alignItems="center">
             <Box flexDirection="row" justifyContent="space-between" width="100%" paddingHorizontal="xs">
@@ -245,7 +343,12 @@ function Dashboard() {
                 return (
                   <AnimatedTouchable
                     key={mood}
-                    onPress={() => setSelectedMood(mood)}
+                    onPress={() => {
+                      setSelectedMood(mood);
+                      // Analyze mood for recommendation
+                      const recommendation = MoodAnalysisService.analyzeMood(mood);
+                      setBreathingRecommendation(recommendation.suggested ? recommendation : null);
+                    }}
                     style={[styles.moodButton, isSelected && styles.moodButtonSelected]}>
                     {isSelected ? (
                       <LinearGradient
@@ -281,7 +384,29 @@ function Dashboard() {
                   placeholder="What's on your mind today?..."
                   placeholderTextColor="#A7A7A7"
                   value={journalText}
-                  onChangeText={setJournalText}
+                  onChangeText={(text) => {
+                    setJournalText(text);
+                    // Analyze in real-time for recommendation (if mood selected)
+                    if (selectedMood && text.trim().length > 10) {
+                      const tempEntry: JournalEntry = {
+                        id: "temp",
+                        mood: selectedMood,
+                        text: text,
+                        timestamp: Date.now(),
+                        createdAt: new Date().toISOString(),
+                      };
+                      const recommendation = MoodAnalysisService.analyzeEntry(tempEntry);
+                      setBreathingRecommendation(recommendation.suggested ? recommendation : null);
+                    } else {
+                      // Check mood only
+                      if (selectedMood) {
+                        const recommendation = MoodAnalysisService.analyzeMood(selectedMood);
+                        setBreathingRecommendation(recommendation.suggested ? recommendation : null);
+                      } else {
+                        setBreathingRecommendation(null);
+                      }
+                    }
+                  }}
                   multiline
                   style={styles.textInput}
                   textAlignVertical="top"
@@ -621,6 +746,29 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontStyle: "italic",
     lineHeight: 24,
+  },
+  // Recommendation Banner Styles
+  recommendationBanner: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(241, 194, 27, 0.3)",
+    shadowColor: "#F1C21B",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  recommendationTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#F1C21B",
+    marginBottom: 4,
+  },
+  recommendationText: {
+    fontSize: 13,
+    color: "#856A1A",
+    lineHeight: 18,
   },
 });
 
