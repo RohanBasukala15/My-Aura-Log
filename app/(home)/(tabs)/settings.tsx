@@ -254,7 +254,7 @@ function Settings() {
     // Check if payment service is available
     if (!PaymentService.isAvailable()) {
       Alert.alert(
-        "Payment Not Available",
+        "Payment Unavailable",
         "Payment service is not configured. Please add your RevenueCat API key to the .env file.",
         [{ text: "OK" }]
       );
@@ -683,7 +683,7 @@ function Settings() {
               placeholder="Enter vibe code"
               placeholderTextColor={theme.colors.textSubdued}
               value={referralCodeInput}
-              onChangeText={text => setReferralCodeInput(text.toUpperCase().trim())}
+              onChangeText={(text: string) => setReferralCodeInput(text.toUpperCase().trim())}
               autoCapitalize="characters"
               autoCorrect={false}
               editable={!isSubmittingCode}
