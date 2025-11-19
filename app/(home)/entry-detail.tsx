@@ -6,8 +6,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import moment from "moment";
 
 import { Box, Text, useTheme } from "@common/components/theme";
-import { JournalEntry } from "@common/models/JournalEntry";
+import { JournalEntry, MOOD_VALUES } from "@common/models/JournalEntry";
 import { JournalStorage } from "@common/services/journalStorage";
+import { MoodAnalysisService } from "@common/services/moodAnalysisService";
 import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -205,6 +206,54 @@ function EntryDetail() {
               </Box>
             </>
           )}
+
+          {/* Breathing Exercise Button - Show for entries with negative emotions */}
+          {(() => {
+            const moodValue = MOOD_VALUES[entry.mood];
+            const recommendation = MoodAnalysisService.analyzeEntry(entry);
+            const shouldShowBreathing = moodValue <= 2 || recommendation.suggested;
+            
+            if (shouldShowBreathing) {
+              return (
+                <Box marginBottom="xl">
+                  <TouchableOpacity
+                    onPress={() => {
+                      const params: Record<string, string> = {
+                        journalEntryId: entry.id,
+                      };
+                      if (entry.mood) {
+                        params.mood = entry.mood;
+                      }
+                      if (entry.aiInsight?.emotion) {
+                        params.emotion = entry.aiInsight.emotion;
+                      }
+                      if (recommendation.duration) {
+                        params.duration = recommendation.duration.toString();
+                      }
+                      router.push({
+                        pathname: "/(home)/(tabs)/breathing",
+                        params,
+                      });
+                    }}
+                    activeOpacity={0.8}>
+                    <LinearGradient
+                      colors={["#9BA7F5", "#7DDAC0"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.breathingButton}>
+                      <Box flexDirection="row" alignItems="center" justifyContent="center" gap="s">
+                        <MaterialIcons name="self-improvement" size={22} color="#FFFFFF" />
+                        <Text variant="h6" style={styles.breathingButtonText}>
+                          Try Breathing Exercise
+                        </Text>
+                      </Box>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Box>
+              );
+            }
+            return null;
+          })()}
         </Box>
       </LinearGradient>
     </ScrollView>
@@ -302,6 +351,20 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontStyle: "italic",
     lineHeight: 24,
+  },
+  breathingButton: {
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: "#9BA7F5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  breathingButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 16,
   },
 });
 

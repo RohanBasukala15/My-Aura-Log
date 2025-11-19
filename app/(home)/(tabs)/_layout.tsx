@@ -54,6 +54,15 @@ function BottomTab() {
         }}
       />
       <Tabs.Screen
+        name="breathing"
+        options={{
+          title: "Breathe",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="self-improvement" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: "Settings",
