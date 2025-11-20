@@ -1,11 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
-import { FontAwesome } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useMemo } from "react";
+import { StyleProp, ViewStyle } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { RectButton } from "react-native-gesture-handler";
-import BottomSheet, { BottomSheetBackdrop, BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 
-import { Box, Text, useTheme } from "../../../theme";
+import { Box } from "../../../theme";
 import { useFeatureTranslation } from "../../../../services/i18n";
 
 import { Toast } from "@common/utils";
@@ -25,7 +22,7 @@ const imageSelectionOptions: ImagePicker.ImagePickerOptions = {
 
 export interface FilePickerProps {
   visible: boolean;
-  onOptionSelected?: (option: "camera" | "file") => void;
+  onOptionSelected?: (option: "file") => void;
   onDismiss?: () => void;
   onFileSelected: (response: ImageInfo[]) => void;
   pickerOptions?: ImagePicker.ImagePickerOptions;
@@ -53,24 +50,6 @@ async function mapFileSelectionResult(rawImages: ImagePicker.ImagePickerAsset[])
   return imageInfoList;
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  center: { alignItems: "center", justifyContent: "center" },
-  selectionText: { marginVertical: 12, fontSize: 16 },
-  pickerOptionContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  shadowContainer: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-});
-
-function BackdropView(props: BottomSheetBackdropProps) {
-  return <BottomSheetBackdrop opacity={0.7} appearsOnIndex={0} disappearsOnIndex={-1} {...props} />;
-}
-
 function FilePickerComponent({
   visible,
   onOptionSelected,
@@ -78,69 +57,12 @@ function FilePickerComponent({
   onFileSelected,
   pickerOptions = {},
 }: FilePickerProps) {
-  const theme = useTheme();
   const t = useFeatureTranslation("components.filePicker.");
-
-  const snapPoints = useMemo(() => ["25%"], []);
-  const bottomSheetRef = useRef<BottomSheet | null>(null);
-
-  const [isPickerVisible, setPickerVisible] = useState(visible);
 
   const options = useMemo(() => ({ ...imageSelectionOptions, ...pickerOptions }), [pickerOptions]);
 
-  const closePicker = useCallback(() => {
-    bottomSheetRef.current?.close();
+  const openFilePicker = useCallback(async () => {
     onDismiss?.();
-  }, [onDismiss, bottomSheetRef]);
-
-  const openPicker = useCallback(() => {
-    Keyboard.dismiss();
-    bottomSheetRef.current?.snapToIndex(0);
-  }, [bottomSheetRef]);
-
-  useEffect(() => {
-    if (visible === isPickerVisible) {
-      return;
-    }
-    setPickerVisible(visible);
-    if (visible) {
-      openPicker();
-    } else {
-      closePicker();
-    }
-  }, [visible, isPickerVisible, closePicker, openPicker]);
-
-  function openCamera() {
-    closePicker();
-
-    ImagePicker.getCameraPermissionsAsync()
-      .then((result) => {
-        if (!result.granted) {
-          return ImagePicker.requestCameraPermissionsAsync();
-        }
-        return Promise.resolve(result);
-      })
-      .then((result) => {
-        if (result.granted) {
-          return ImagePicker.launchCameraAsync(options);
-        }
-        return Promise.reject(new Error(`Camera permission ${result.status} by user`));
-      })
-      .then((response) => {
-        if (response.canceled || !response.assets || response.assets?.length <= 0) {
-          return Promise.reject(new Error(t("message.image_cancelled") ?? ""));
-        }
-        return response.assets;
-      })
-      .then(mapFileSelectionResult)
-      .then(onFileSelected)
-      .catch((e) => {
-        Toast.show(e.message, { type: "error" });
-      });
-  }
-
-  async function openFilePicker() {
-    closePicker();
 
     ImagePicker.getMediaLibraryPermissionsAsync()
       .then((result) => {
@@ -162,7 +84,10 @@ function FilePickerComponent({
         return response.assets;
       })
       .then(mapFileSelectionResult)
-      .then(onFileSelected)
+      .then((images) => {
+        onOptionSelected?.("file");
+        onFileSelected(images);
+      })
       .catch((e) => {
         if (e.message?.includes(t("message.file_write_failed") ?? "")) {
           Toast.show(t("label.could_not_select_image"), { type: "error" });
@@ -170,51 +95,16 @@ function FilePickerComponent({
           Toast.show(e.message);
         }
       });
-  }
+  }, [options, t, onDismiss, onOptionSelected, onFileSelected]);
 
-  return (
-    <BottomSheet
-      style={styles.flex}
-      onClose={onDismiss}
-      ref={bottomSheetRef}
-      enablePanDownToClose
-      snapPoints={snapPoints}
-      index={isPickerVisible ? 0 : -1}
-      backdropComponent={BackdropView}
-      backgroundStyle={{ backgroundColor: theme.colors.surfaceDefault }}
-    >
-      <Box flex={1} paddingHorizontal="m" backgroundColor="surfaceDefault">
-        <Text>{t("label.select_option")}</Text>
-        <View style={styles.pickerOptionContainer}>
-          <RectButton
-            style={styles.flex}
-            onPress={() => {
-              onOptionSelected?.("camera");
-              openCamera();
-            }}
-          >
-            <View style={[styles.flex, styles.center]}>
-              <FontAwesome size={32} name="camera" color={theme.colors.primary} />
-              <Text style={styles.selectionText}>{t("label.camera")}</Text>
-            </View>
-          </RectButton>
+  useEffect(() => {
+    if (visible) {
+      openFilePicker();
+    }
+  }, [visible, openFilePicker]);
 
-          <RectButton
-            style={styles.flex}
-            onPress={() => {
-              onOptionSelected?.("file");
-              openFilePicker();
-            }}
-          >
-            <View style={[styles.flex, styles.center]}>
-              <FontAwesome size={32} name="file-text" color={theme.colors.primary} />
-              <Text style={styles.selectionText}>{t("label.files")}</Text>
-            </View>
-          </RectButton>
-        </View>
-      </Box>
-    </BottomSheet>
-  );
+  // Component doesn't render UI - it directly opens the file picker when visible
+  return null;
 }
 
 export function FilePicker({
