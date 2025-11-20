@@ -79,6 +79,7 @@ module.exports = ({ config }) => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
+      buildNumber: "2",
     },
     android: {
       adaptiveIcon: {
@@ -86,6 +87,7 @@ module.exports = ({ config }) => {
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
+      versionCode: 2,
     },
     plugins: [
       ["expo-build-properties", { android: { usesCleartextTraffic } }],
