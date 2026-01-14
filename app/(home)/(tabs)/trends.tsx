@@ -17,6 +17,12 @@ function Trends() {
   const [weeklyData, setWeeklyData] = useState<{ labels: string[]; datasets: any[] } | null>(null);
   const [averageMood, setAverageMood] = useState<number>(0);
 
+  // Ensure averageMood is always a valid number
+  const safeAverageMood = useMemo(() => {
+    const num = Number(averageMood);
+    return isFinite(num) && !isNaN(num) ? num : 0;
+  }, [averageMood]);
+
   const loadEntries = async () => {
     try {
       const allEntries = await JournalStorage.getAllEntries();
@@ -30,7 +36,7 @@ function Trends() {
   const processChartData = (allEntries: JournalEntry[]) => {
     if (allEntries.length === 0) {
       setWeeklyData(null);
-      setAverageMood(0);
+      setAverageMood(0); // Explicitly set to 0, not NaN
       return;
     }
 
@@ -44,9 +50,33 @@ function Trends() {
       };
     });
 
-    // Calculate average mood
-    const moodSum = allEntries.reduce((sum, entry) => sum + MOOD_VALUES[entry.mood], 0);
-    setAverageMood(moodSum / allEntries.length);
+    // Calculate average mood - filter out entries with invalid moods
+    const validEntries = allEntries.filter(entry => {
+      const moodValue = MOOD_VALUES[entry.mood];
+      return moodValue !== undefined && !isNaN(moodValue);
+    });
+    const moodSum = validEntries.reduce((sum, entry) => {
+      const moodValue = MOOD_VALUES[entry.mood];
+      const numValue = Number(moodValue);
+      return sum + (isFinite(numValue) ? numValue : 0);
+    }, 0);
+    
+    // Calculate average and ensure it's never NaN
+    const calculatedAvg = validEntries.length > 0 && isFinite(moodSum) ? moodSum / validEntries.length : 0;
+    const finalAvg = isFinite(calculatedAvg) && !isNaN(calculatedAvg) ? calculatedAvg : 0;
+    
+    // Triple-check before setting state - never set NaN
+    let safeFinalAvg = 0;
+    if (typeof finalAvg === 'number' && isFinite(finalAvg) && !isNaN(finalAvg)) {
+      safeFinalAvg = finalAvg;
+    }
+    
+    // Final validation
+    if (isNaN(safeFinalAvg) || !isFinite(safeFinalAvg)) {
+      safeFinalAvg = 0;
+    }
+    
+    setAverageMood(safeFinalAvg);
 
     // Group entries by date
     const entriesByDate = last7Days.map(day => {
@@ -59,19 +89,52 @@ function Trends() {
         return null;
       }
 
-      // Average mood for the day if multiple entries
-      const avgMood = dayEntries.reduce((sum, entry) => sum + MOOD_VALUES[entry.mood], 0) / dayEntries.length;
-      return avgMood;
+      // Average mood for the day if multiple entries - filter out invalid moods
+      const validDayEntries = dayEntries.filter(entry => {
+        const moodValue = MOOD_VALUES[entry.mood];
+        return moodValue !== undefined && !isNaN(moodValue);
+      });
+      
+      if (validDayEntries.length === 0) {
+        return null;
+      }
+      
+      const daySum = validDayEntries.reduce((sum, entry) => {
+        const moodValue = MOOD_VALUES[entry.mood];
+        const numValue = Number(moodValue);
+        return sum + (isFinite(numValue) ? numValue : 0);
+      }, 0);
+      const avgMood = validDayEntries.length > 0 && isFinite(daySum) ? daySum / validDayEntries.length : null;
+      const finalAvgMood = avgMood !== null && isFinite(avgMood) && !isNaN(avgMood) ? avgMood : null;
+      return finalAvgMood;
     });
 
-    // Fill missing days with null
-    const data = entriesByDate.map(value => value ?? null);
+    // Fill missing days with null and filter out any NaN values
+    // Convert to numbers and ensure all values are finite
+    const data = entriesByDate.map((value) => {
+      if (value === null || value === undefined) return null;
+      const numValue = Number(value);
+      if (!isFinite(numValue) || isNaN(numValue)) {
+        return null;
+      }
+      return numValue;
+    });
+    
+    // Final sanitization - ensure no NaN or invalid values
+    const sanitizedData = data.map((v) => {
+      if (v === null || v === undefined) return null;
+      const num = Number(v);
+      if (!isFinite(num) || isNaN(num)) {
+        return null;
+      }
+      return num;
+    });
 
     setWeeklyData({
       labels: last7Days.map(d => d.label),
       datasets: [
         {
-          data: data,
+          data: sanitizedData,
           color: (opacity = 1) => theme.colors.primary,
           strokeWidth: 2,
         },
@@ -137,7 +200,53 @@ function Trends() {
       return false;
     }
 
-    return weeklyData.datasets.some(dataset => dataset.data.some((value: number | null) => typeof value === "number"));
+    return weeklyData.datasets.some(dataset => 
+      dataset.data.some((value: number | null) => {
+        if (value === null || value === undefined) return false;
+        const num = Number(value);
+        return typeof num === "number" && isFinite(num) && !isNaN(num);
+      })
+    );
+  }, [weeklyData]);
+
+  // Sanitize weeklyData before rendering to ensure no NaN values
+  const sanitizedWeeklyData = useMemo(() => {
+    if (!weeklyData) return null;
+    
+    const sanitizedDatasets = weeklyData.datasets.map((dataset) => {
+      const sanitizedData = dataset.data.map((value: number | null) => {
+        // Handle null/undefined
+        if (value === null || value === undefined) {
+          return null;
+        }
+        
+        // Convert to number and validate
+        const num = Number(value);
+        if (!isFinite(num) || isNaN(num)) {
+          return null;
+        }
+        
+        return num;
+      });
+      
+      // Verify no NaN in final array and force replace any remaining NaN with null
+      const finalData = sanitizedData.map(v => {
+        if (v !== null && (isNaN(v) || !isFinite(v))) {
+          return null;
+        }
+        return v;
+      });
+      
+      return {
+        ...dataset,
+        data: finalData
+      };
+    });
+    
+    return {
+      ...weeklyData,
+      datasets: sanitizedDatasets
+    };
   }, [weeklyData]);
 
   if (entries.length === 0) {
@@ -160,7 +269,7 @@ function Trends() {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.backgroundDefault }]}>
       <StatusBar style="dark" />
       <Box padding="m" paddingTop="xxxl">
-        <Text variant="h2" marginBottom="xs" textAlign={"center"} color="textDefault">
+        <Text variant="h2-pacifico" marginBottom="xs" textAlign={"center"} color="textDefault">
           Mood Trends
         </Text>
         <Text variant="default" marginBottom="s" color="textSubdued" textAlign="center">
@@ -209,10 +318,10 @@ function Trends() {
               Overall Mood Score
             </Text>
             <Text variant="h2" color="primary">
-              {averageMood.toFixed(1)}
+              {safeAverageMood.toFixed(1)}
             </Text>
             <Text variant="h7" color="textSubdued">
-              Feels {getMoodLabel(averageMood)} on average
+              Feels {getMoodLabel(safeAverageMood)} on average
             </Text>
             <Text variant="h7" color="textSubdued">
               Across {entries.length} {entries.length === 1 ? "entry" : "entries"}
@@ -244,7 +353,7 @@ function Trends() {
         </Box>
 
         {/* Weekly Chart */}
-        {weeklyData && (
+        {sanitizedWeeklyData && (
           <Box
             borderRadius="m"
             style={{
@@ -265,7 +374,7 @@ function Trends() {
             </Box>
             {hasRecentMoodData ? (
               <LineChart
-                data={weeklyData}
+                data={sanitizedWeeklyData}
                 width={screenWidth - 64}
                 height={250}
                 chartConfig={chartConfig}
@@ -314,12 +423,12 @@ function Trends() {
             )
               .sort((a, b) => b[1] - a[1])
               .map(([mood, count]) => {
-                const percentage = (count / entries.length) * 100;
+                const percentage = entries.length > 0 ? (count / entries.length) * 100 : 0;
                 return (
                   <Box key={mood} marginBottom="m">
                     <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="xs">
                       <Text variant="h5" color="textDefault">
-                        {`${mood} ${MOOD_LABELS[mood as keyof typeof MOOD_LABELS]}`}
+                        {`${mood} ${MOOD_LABELS[mood as keyof typeof MOOD_LABELS] || 'Unknown'}`}
                       </Text>
                       <Text variant="h6" color="textSubdued">
                         {percentage.toFixed(0)}%

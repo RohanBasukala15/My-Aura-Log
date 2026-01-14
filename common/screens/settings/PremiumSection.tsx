@@ -11,7 +11,10 @@ type PremiumSectionProps = {
   referralCode: string;
   referralCount: number;
   remainingReferrals: number;
-  onBuyPremium: () => void;
+  lifetimePrice?: string; // e.g., "$4.99" or "$5.00"
+  monthlyPrice?: string; // e.g., "$1.99"
+  onBuyLifetime: () => void;
+  onBuyMonthly: () => void;
   onRestorePurchases: () => void;
   onInviteFriends: () => void;
   onOpenReferralModal: () => void;
@@ -24,7 +27,10 @@ export function PremiumSection({
   referralCode,
   referralCount,
   remainingReferrals,
-  onBuyPremium,
+  lifetimePrice,
+  monthlyPrice,
+  onBuyLifetime,
+  onBuyMonthly,
   onRestorePurchases,
   onInviteFriends,
   onOpenReferralModal,
@@ -63,10 +69,10 @@ export function PremiumSection({
       ) : (
         <>
           <Text variant="h4" marginBottom="m" color="textDefault">
-            Upgrade to Premium ⭐
+            Upgrade to Premium
           </Text>
           <Text variant="default" color="textDefault" marginBottom="s">
-            Choose how you'd like to unlock premium features
+            Choose how you&apos;d like to unlock premium features
           </Text>
           <Text variant="caption" color="textSubdued" marginBottom="m">
             Get unlimited AI analysis and support future development
@@ -85,7 +91,12 @@ export function PremiumSection({
             </Box>
           )}
 
-          <TouchableOpacity onPress={onBuyPremium} activeOpacity={0.8} style={styles.premiumButton} disabled={isProcessingPayment}>
+          {/* Monthly Subscription Option */}
+          {monthlyPrice && <TouchableOpacity
+            onPress={onBuyMonthly}
+            activeOpacity={0.8}
+            style={[styles.premiumButton, styles.monthlyButton]}
+            disabled={isProcessingPayment}>
             <LinearGradient
               colors={isProcessingPayment ? ["#D3D3D3", "#B8B8B8"] : ["#9B87F5", "#7DD3C0"]}
               start={{ x: 0, y: 0 }}
@@ -94,12 +105,44 @@ export function PremiumSection({
               {isProcessingPayment ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <Text variant="button" style={styles.premiumButtonText}>
-                  ☕ Buy Me a Coffee ($5)
-                </Text>
+                <Box alignItems="center">
+                  <Text variant="button" style={styles.premiumButtonText}>
+                    ⭐ Monthly Premium
+                  </Text>
+                  <Text variant="caption" style={styles.priceText}>
+                    {monthlyPrice}/months
+                  </Text>
+                </Box>
               )}
             </LinearGradient>
-          </TouchableOpacity>
+          </TouchableOpacity>}
+
+          {/* Lifetime Purchase Option */}
+         {lifetimePrice && <TouchableOpacity
+            onPress={onBuyLifetime}
+            activeOpacity={0.8}
+            style={[styles.premiumButton, styles.lifetimeButton]}
+            disabled={isProcessingPayment}>
+            <LinearGradient
+              colors={isProcessingPayment ? ["#D3D3D3", "#B8B8B8"] : ["#7DD3C0", "#9B87F5"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.premiumButtonGradient}>
+              {isProcessingPayment ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Box alignItems="center">
+                  <Text variant="button" style={styles.premiumButtonText}>
+                    ☕ Lifetime Premium
+                  </Text>
+                  <Text variant="caption" style={styles.priceText}>
+                    {lifetimePrice} one-time
+                  </Text>
+                </Box>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>}
+
           <TouchableOpacity onPress={onRestorePurchases} style={styles.restoreButton} disabled={isProcessingPayment}>
             <Text variant="h7" color="primary" textAlign="center">
               Restore Purchases
@@ -115,7 +158,11 @@ export function PremiumSection({
           </Box>
 
           <TouchableOpacity onPress={onInviteFriends} activeOpacity={0.8} style={styles.inviteButton}>
-            <LinearGradient colors={["#7DD3C0", "#9B87F5"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.premiumButtonGradient}>
+            <LinearGradient
+              colors={["#7DD3C0", "#9B87F5"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.premiumButtonGradient}>
               <Text variant="button" style={styles.premiumButtonText}>
                 👥 Invite 3 Friends
               </Text>
@@ -137,7 +184,7 @@ export function PremiumSection({
                   {referralCode}
                 </Text>
                 <Text variant="caption" color="textSubdued" textAlign="center">
-                  Share this code with friends! When 3 friends join using your code, you'll unlock premium.
+                  Share this code with friends! When 3 friends join using your code, you&apos;ll unlock premium.
                 </Text>
               </>
             ) : (
@@ -183,6 +230,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+    marginBottom: 12,
+  },
+  monthlyButton: {
+    shadowColor: "#9B87F5",
+  },
+  lifetimeButton: {
+    shadowColor: "#7DD3C0",
   },
   premiumButtonGradient: {
     paddingVertical: 16,
@@ -195,6 +249,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.5,
+  },
+  priceText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 4,
+    opacity: 0.9,
   },
   restoreButton: {
     marginTop: 12,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ScrollView,
   TouchableOpacity,
@@ -14,83 +14,449 @@ import Animated from "react-native-reanimated";
 import { useRouter, useFocusEffect } from "expo-router";
 
 import { Box, Text, useTheme } from "@common/components/theme";
-import { JournalEntry, MoodEmoji, MOOD_EMOJIS, MOOD_LABELS, AIInsight } from "@common/models/JournalEntry";
+import { JournalEntry, MoodEmoji, MOOD_EMOJIS, AIInsight } from "@common/models/JournalEntry";
 import { JournalStorage } from "@common/services/journalStorage";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { OpenAIService } from "@common/services/openaiService";
 import { PremiumService } from "@common/services/premiumService";
+import { Storage } from "@common/services/Storage";
 import { useAppDispatch, useAppSelector } from "@common/redux";
 import type { RootState } from "@common/redux/store";
 import { setUpgradeAlertShown, checkUpgradeAlertStatus } from "@common/redux/slices/premium/premium.slice";
+import {
+  setMood,
+  setJournalText,
+  toggleTag,
+  toggleEmotion,
+  toggleSleep,
+  toggleHealth,
+  toggleHobby,
+  setQuickNote,
+  resetDraft,
+} from "@common/redux/slices/entryDraft/entryDraft.slice";
 import { MoodAnalysisService } from "@common/services/moodAnalysisService";
 import { BreathingRecommendation } from "@common/models/BreathingSession";
 import { MaterialIcons } from "@expo/vector-icons";
 
-import dashboardCopy from "./dashboardCopy.json";
+import dashboardCopy from "./HeaderTitleEntity.json";
 
 const copyContent = dashboardCopy as {
   headerTitles: string[];
   headerSubtitles: string[];
 };
 
+const AVAILABLE_TAGS = ["work", "health", "family", "relationships", "personal", "other"] as const;
+const MIN_TEXT_LENGTH_FOR_ANALYSIS = 10;
+const BREATHING_ALERT_DELAY = 500;
+
+const EMOTION_OPTIONS = [
+  { id: "happy", label: "happy", icon: "🎈" },
+  { id: "excited", label: "excited", icon: "🎉" },
+  { id: "grateful", label: "grateful", icon: "💚" },
+  { id: "relaxed", label: "relaxed", icon: "🏝️" },
+  { id: "content", label: "content", icon: "🙏" },
+  { id: "tired", label: "tired", icon: "😴" },
+  { id: "unsure", label: "unsure", icon: "❓" },
+  { id: "bored", label: "bored", icon: "⚡" },
+  { id: "anxious", label: "anxious", icon: "☁️" },
+  { id: "angry", label: "angry", icon: "🌋" },
+  { id: "stressed", label: "stressed", icon: "😰" },
+  { id: "sad", label: "sad", icon: "💧" },
+  { id: "desperate", label: "desperate", icon: "🆘" },
+];
+
+const SLEEP_OPTIONS = [
+  { id: "good-sleep", label: "good sleep", icon: "💤" },
+  { id: "medium-sleep", label: "medium sleep", icon: "😴" },
+  { id: "bad-sleep", label: "bad sleep", icon: "🛏️" },
+  { id: "sleep-early", label: "sleep early", icon: "🌙" },
+];
+
+const HEALTH_OPTIONS = [
+  { id: "exercise", label: "exercise", icon: "🧘" },
+  { id: "eat-healthy", label: "eat healthy", icon: "🥕" },
+  { id: "drink-water", label: "drink water", icon: "💧" },
+  { id: "walk", label: "walk", icon: "🚶" },
+  { id: "sport", label: "sport", icon: "🏃" },
+  { id: "short-exercise", label: "short exercise", icon: "🏋️" },
+];
+
+const HOBBIES_OPTIONS = [
+  { id: "movies", label: "movies", icon: "📺" },
+  { id: "read", label: "read", icon: "📖" },
+  { id: "gaming", label: "gaming", icon: "🎮" },
+  { id: "relax", label: "relax", icon: "🏖️" },
+];
+
+// Helper Functions
 const pickRandom = (options: string[], fallback: string): string => {
-  if (!Array.isArray(options) || options.length === 0) {
-    return fallback;
-  }
+  if (!Array.isArray(options) || options.length === 0) return fallback;
   const index = Math.floor(Math.random() * options.length);
   return options[index] ?? fallback;
 };
 
+const buildBreathingParams = (recommendation: BreathingRecommendation): Record<string, string> => {
+  const params: Record<string, string> = {};
+  if (recommendation.journalEntryId) params.journalEntryId = recommendation.journalEntryId;
+  if (recommendation.mood) params.mood = recommendation.mood;
+  if (recommendation.emotion) params.emotion = recommendation.emotion;
+  if (recommendation.duration) params.duration = recommendation.duration.toString();
+  return params;
+};
+
+const capitalizeFirst = (str: string): string => str.charAt(0).toUpperCase() + str.slice(1);
+
+// Components
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-function Dashboard() {
+interface BreathingBannerProps {
+  recommendation: BreathingRecommendation;
+  onPress: () => void;
+}
+
+const BreathingBanner: React.FC<BreathingBannerProps> = ({ recommendation, onPress }) => (
+  <Box marginBottom="m">
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      <LinearGradient
+        colors={["#FFF9E6", "#FFF4D6"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.recommendationBanner}>
+        <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+          <Box flex={1}>
+            <Text variant="h6" style={styles.recommendationTitle}>
+              🧘 Try Breathing Exercise
+            </Text>
+            <Text variant="h7" style={styles.recommendationText}>
+              {recommendation.reason}
+            </Text>
+          </Box>
+          <MaterialIcons name="arrow-forward" size={20} color="#F1C21B" />
+        </Box>
+      </LinearGradient>
+    </TouchableOpacity>
+  </Box>
+);
+
+interface MoodSelectorProps {
+  selectedMood: MoodEmoji | null;
+  onSelect: (mood: MoodEmoji) => void;
+}
+
+const MoodSelector: React.FC<MoodSelectorProps> = ({ selectedMood, onSelect }) => (
+  <Box marginBottom="xl" alignItems="center">
+    <Box flexDirection="row" justifyContent="space-between" width="100%" paddingHorizontal="xs">
+      {MOOD_EMOJIS.map(mood => {
+        const isSelected = selectedMood === mood;
+        return (
+          <AnimatedTouchable
+            key={mood}
+            onPress={() => onSelect(mood)}
+            style={[styles.moodButton, isSelected && styles.moodButtonSelected]}>
+            {isSelected ? (
+              <LinearGradient
+                colors={["#9BA7F5", "#7DDAC0"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.moodButtonGradient}>
+                <Text style={styles.moodEmoji}>{mood}</Text>
+              </LinearGradient>
+            ) : (
+              <Box style={styles.moodButtonUnselected}>
+                <Text style={styles.moodEmojiUnselected}>{mood}</Text>
+              </Box>
+            )}
+          </AnimatedTouchable>
+        );
+      })}
+    </Box>
+  </Box>
+);
+
+interface CollapsibleSectionProps {
+  title: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, expanded, onToggle, children }) => (
+  <Box marginBottom="m">
+    <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={styles.sectionHeader}>
+      <Text variant="h5" color="textDefault" style={styles.sectionTitle}>
+        {title} <Text style={styles.optionalText}>(optional)</Text>
+      </Text>
+      <Text style={styles.collapseIcon}>{expanded ? "˄" : "+"}</Text>
+    </TouchableOpacity>
+    {expanded && <Box marginTop="s">{children}</Box>}
+  </Box>
+);
+
+interface OptionButtonProps {
+  id: string;
+  label: string;
+  icon: string;
+  isSelected: boolean;
+  onPress: () => void;
+}
+
+const OptionButton: React.FC<OptionButtonProps> = ({ label, icon, isSelected, onPress }) => (
+  <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+    {isSelected ? (
+      <LinearGradient
+        colors={["#9B87F5", "#7DD3C0"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.tagButtonSelected}>
+        <Text variant="h6" style={styles.tagTextSelected}>
+          {icon} {capitalizeFirst(label)}
+        </Text>
+      </LinearGradient>
+    ) : (
+      <Box style={styles.tagButton}>
+        <Text variant="h6" color="textDefault" style={styles.tagText}>
+          {icon} {capitalizeFirst(label)}
+        </Text>
+      </Box>
+    )}
+  </TouchableOpacity>
+);
+
+interface NextOrSaveButtonProps {
+  isLoading: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}
+
+const NextOrSaveButton: React.FC<NextOrSaveButtonProps> = ({ isLoading, disabled, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    disabled={disabled}
+    activeOpacity={0.8}
+    style={[styles.saveButton, disabled && styles.saveButtonDisabled]}>
+    <LinearGradient
+      colors={!disabled ? ["#9B87F5", "#7DD3C0"] : ["#D3D3D3", "#B8B8B8"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.saveButtonGradient}>
+      {isLoading ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <Text variant="button" style={styles.saveButtonText}>
+          Save Entry
+        </Text>
+      )}
+    </LinearGradient>
+  </TouchableOpacity>
+);
+
+interface AIUsageIndicatorProps {
+  remainingAI: number;
+  isPremium: boolean;
+}
+
+const AIUsageIndicator: React.FC<AIUsageIndicatorProps> = ({ remainingAI, isPremium }) => {
   const theme = useTheme();
+  if (isPremium || remainingAI < 0) return null;
+
+  return (
+    <Box marginTop="m" alignItems="flex-end" marginBottom="s">
+      <Box
+        flexDirection="row"
+        justifyContent="space-between"
+        flex={1}
+        paddingHorizontal="m"
+        paddingVertical="xs"
+        borderRadius="m"
+        style={{
+          backgroundColor: theme.colors.backgroundHovered,
+          borderWidth: 1,
+          borderColor: theme.colors.primary,
+        }}>
+        <Text variant="h7" color="primary" textAlign="center">
+          {remainingAI > 0
+            ? `✨ ${remainingAI} AI analysis${remainingAI === 1 ? "" : "es"} remaining today`
+            : "✨ AI analyses used up today"}
+        </Text>
+      </Box>
+    </Box>
+  );
+};
+
+// Main Component
+function Dashboard() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const upgradeAlertShownToday = useAppSelector((state: RootState) => state.premium.upgradeAlertShownToday);
+  const {
+    selectedMood,
+    journalText,
+    selectedTags,
+    selectedEmotions,
+    selectedSleep,
+    selectedHealth,
+    selectedHobbies,
+    quickNote,
+  } = useAppSelector((state: RootState) => state.entryDraft);
 
-  const [selectedMood, setSelectedMood] = useState<MoodEmoji | null>(null);
-  const [journalText, setJournalText] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // UI state for collapsible sections
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [emotionsExpanded, setEmotionsExpanded] = useState(false);
+  const [sleepExpanded, setSleepExpanded] = useState(false);
+  const [healthExpanded, setHealthExpanded] = useState(false);
+  const [hobbiesExpanded, setHobbiesExpanded] = useState(false);
+  const [quickNoteExpanded, setQuickNoteExpanded] = useState(false);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
   const [remainingAI, setRemainingAI] = useState<number>(-1);
   const [isPremium, setIsPremium] = useState(false);
   const [breathingRecommendation, setBreathingRecommendation] = useState<BreathingRecommendation | null>(null);
-  const [headerTitle] = useState(() =>
-    pickRandom(copyContent.headerTitles, "How are you feeling today?")
-  );
-  const [headerSubtitle] = useState(() =>
-    pickRandom(copyContent.headerSubtitles, "Take a moment to reflect on your day")
-  );
+  const [userName, setUserName] = useState<string | null>(null);
 
-  const availableTags = ["work", "health", "family", "relationships", "personal", "other"];
+  // Load user name
+  const loadUserName = useCallback(async () => {
+    const name = await Storage.getItem<string>("user_name", null);
+    setUserName(name);
+  }, []);
+
+  useEffect(() => {
+    loadUserName();
+  }, [loadUserName]);
+
+  // Personalize headers with user name if available
+  const headerTitle = useMemo(() => {
+    const baseTitle = pickRandom(copyContent.headerTitles, "How are you feeling today?");
+    if (userName && userName.trim()) {
+      // Add name to title in a natural way
+      // Examples: "How's your aura feeling?" -> "How's your aura feeling, Mike?"
+      // "What's the vibe right now?" -> "What's the vibe right now, Mike?"
+      const name = userName.trim();
+      // Check if title ends with question mark, if so add name before it
+      if (baseTitle.endsWith("?")) {
+        return `${baseTitle.slice(0, -1)}, ${name}?`;
+      }
+      return `${baseTitle}, ${name}`;
+    }
+    return baseTitle;
+  }, [userName]);
+
+  const headerSubtitle = useMemo(
+    () => pickRandom(copyContent.headerSubtitles, "Take a moment to reflect on your day"),
+    []
+  );
 
   const loadPremiumStatus = useCallback(async () => {
-    const premium = await PremiumService.isPremium();
-    const remaining = await PremiumService.getRemainingAIUsage();
+    const [premium, remaining] = await Promise.all([PremiumService.isPremium(), PremiumService.getRemainingAIUsage()]);
     setIsPremium(premium);
     setRemainingAI(remaining);
   }, []);
 
   useEffect(() => {
     loadPremiumStatus();
-    // Check if upgrade alert was shown today on mount
     dispatch(checkUpgradeAlertStatus());
   }, [loadPremiumStatus, dispatch]);
 
-  // Refresh premium status when screen comes into focus (e.g., after purchasing premium)
   useFocusEffect(
     useCallback(() => {
       loadPremiumStatus();
-      // Check if upgrade alert status changed (e.g., new day)
+      loadUserName();
       dispatch(checkUpgradeAlertStatus());
-    }, [loadPremiumStatus, dispatch])
+    }, [loadPremiumStatus, loadUserName, dispatch])
   );
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev: string[]) => (prev.includes(tag) ? prev.filter((t: string) => t !== tag) : [...prev, tag]));
-  };
+  const updateBreathingRecommendation = useCallback((mood: MoodEmoji | null, text: string) => {
+    if (!mood) {
+      setBreathingRecommendation(null);
+      return;
+    }
 
-  const showUpgradeAlert = (): Promise<boolean> => {
+    if (text.trim().length > MIN_TEXT_LENGTH_FOR_ANALYSIS) {
+      const tempEntry: JournalEntry = {
+        id: "temp",
+        mood,
+        text,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString(),
+      };
+      const recommendation = MoodAnalysisService.analyzeEntry(tempEntry);
+      setBreathingRecommendation(recommendation.suggested ? recommendation : null);
+    } else {
+      const recommendation = MoodAnalysisService.analyzeMood(mood);
+      setBreathingRecommendation(recommendation.suggested ? recommendation : null);
+    }
+  }, []);
+
+  const handleMoodSelect = useCallback(
+    (mood: MoodEmoji) => {
+      dispatch(setMood(mood));
+      updateBreathingRecommendation(mood, journalText);
+    },
+    [journalText, updateBreathingRecommendation, dispatch]
+  );
+
+  const handleTextChange = useCallback(
+    (text: string) => {
+      dispatch(setJournalText(text));
+      updateBreathingRecommendation(selectedMood, text);
+    },
+    [selectedMood, updateBreathingRecommendation, dispatch]
+  );
+
+  const handleToggleTag = useCallback(
+    (tag: string) => {
+      dispatch(toggleTag(tag));
+    },
+    [dispatch]
+  );
+
+  const handleToggleEmotion = useCallback(
+    (emotion: string) => {
+      dispatch(toggleEmotion(emotion));
+    },
+    [dispatch]
+  );
+
+  const handleToggleSleep = useCallback(
+    (sleep: string) => {
+      dispatch(toggleSleep(sleep));
+    },
+    [dispatch]
+  );
+
+  const handleToggleHealth = useCallback(
+    (health: string) => {
+      dispatch(toggleHealth(health));
+    },
+    [dispatch]
+  );
+
+  const handleToggleHobby = useCallback(
+    (hobby: string) => {
+      dispatch(toggleHobby(hobby));
+    },
+    [dispatch]
+  );
+
+  const handleQuickNoteChange = useCallback(
+    (text: string) => {
+      dispatch(setQuickNote(text));
+    },
+    [dispatch]
+  );
+
+  const navigateToBreathing = useCallback(
+    (recommendation: BreathingRecommendation) => {
+      router.push({
+        pathname: "/(home)/(tabs)/breathing",
+        params: buildBreathingParams(recommendation),
+      });
+    },
+    [router]
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const showUpgradeAlert = useCallback((): Promise<boolean> => {
     return new Promise(resolve => {
       Alert.alert(
         "Treat Yourself to Premium ☕",
@@ -113,150 +479,134 @@ function Dashboard() {
         { cancelable: true }
       );
     });
-  };
+  }, [router]);
 
-  const handleSaveEntry = async () => {
-    if (!selectedMood) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleAICheck = useCallback(async (): Promise<boolean> => {
+    const canUseAI = await PremiumService.canUseAI();
+    if (canUseAI) return true;
+
+    if (!upgradeAlertShownToday) {
+      const wantsToUpgrade = await showUpgradeAlert();
+      dispatch(setUpgradeAlertShown(true));
+      if (wantsToUpgrade) return false;
+    }
+
+    return false;
+  }, [upgradeAlertShownToday, showUpgradeAlert, dispatch]);
+
+  /**
+   * Builds context object for AI insight generation from all entry fields
+   */
+  const buildAIContext = useCallback(() => {
+    const context: {
+      tags?: string[];
+      emotions?: string[];
+      sleep?: string[];
+      healthActivities?: string[];
+      hobbies?: string[];
+      quickNote?: string;
+    } = {};
+
+    if (selectedTags.length > 0) context.tags = selectedTags;
+    if (selectedEmotions.length > 0) context.emotions = selectedEmotions;
+    if (selectedSleep.length > 0) context.sleep = selectedSleep;
+    if (selectedHealth.length > 0) context.healthActivities = selectedHealth;
+    if (selectedHobbies.length > 0) context.hobbies = selectedHobbies;
+    if (quickNote?.trim()) context.quickNote = quickNote.trim();
+
+    return Object.keys(context).length > 0 ? context : undefined;
+  }, [selectedTags, selectedEmotions, selectedSleep, selectedHealth, selectedHobbies, quickNote]);
+
+  const generateAIInsight = useCallback(async (): Promise<AIInsight | undefined> => {
+    if (!selectedMood) return undefined;
+    try {
+      const context = buildAIContext();
+      const insight = await OpenAIService.generateInsight(journalText, selectedMood, context);
+      await PremiumService.incrementAIUsage();
+      await loadPremiumStatus();
+      return insight;
+    } catch (error) {
       Toast.show({
-        type: "error",
-        text1: "Pick a mood to match your moment.",
+        type: "warning",
+        text1: "AI insight took a rain check",
+        text2: "Saved your entry without the extra sparkle.",
       });
+      return undefined;
+    }
+  }, [journalText, selectedMood, buildAIContext, loadPremiumStatus]);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const showBreathingAlert = useCallback(
+    (recommendation: BreathingRecommendation) => {
+      setTimeout(() => {
+        Alert.alert(
+          "🧘 Breathing Exercise",
+          recommendation.reason,
+          [
+            { text: "Maybe later", style: "cancel" },
+            {
+              text: "Start Session",
+              style: "default",
+              onPress: () => navigateToBreathing(recommendation),
+            },
+          ],
+          { cancelable: true }
+        );
+      }, BREATHING_ALERT_DELAY);
+    },
+    [navigateToBreathing]
+  );
+
+  const handleSaveEntry = useCallback(async () => {
+    if (!selectedMood) {
+      Toast.show({ type: "error", text1: "Pick a mood to match your moment." });
       return;
     }
 
     if (!journalText.trim()) {
-      Toast.show({
-        type: "error",
-        text1: "Add a few words about your day.",
-      });
+      Toast.show({ type: "error", text1: "Add a few words about your day." });
       return;
-    }
-
-    // Check if user can use AI
-    const canUseAI = await PremiumService.canUseAI();
-    let shouldAnalyze = canUseAI;
-
-    // If user can't use AI, show upgrade prompt (only once per day)
-    if (!canUseAI && !upgradeAlertShownToday) {
-      const wantsToUpgrade = await showUpgradeAlert();
-      // Mark alert as shown for today
-      dispatch(setUpgradeAlertShown(true));
-      if (wantsToUpgrade) {
-        // User wants to upgrade, redirect to settings
-        return;
-      }
-      // User chose to skip, save without AI analysis
-      shouldAnalyze = false;
-    } else if (!canUseAI && upgradeAlertShownToday) {
-      // Alert already shown today, just save without AI
-      shouldAnalyze = false;
     }
 
     setIsLoading(true);
     try {
-      let aiInsight: AIInsight | undefined = undefined;
+      const shouldAnalyze = await handleAICheck();
+      const aiInsight = shouldAnalyze ? await generateAIInsight() : undefined;
 
-      // Only generate AI insight if user can use it
-      if (shouldAnalyze) {
-        try {
-          aiInsight = await OpenAIService.generateInsight(
-            journalText,
-            selectedMood,
-            selectedTags.length > 0 ? selectedTags : undefined
-          );
-          // Increment usage count after successful AI generation
-          await PremiumService.incrementAIUsage();
-          // Reload premium status to update remaining count
-          await loadPremiumStatus();
-        } catch (error) {
-          Toast.show({
-            type: "warning",
-            text1: "AI insight took a rain check",
-            text2: "Saved your entry without the extra sparkle.",
-          });
-        }
-      }
-      // If user skipped or couldn't use AI, aiInsight remains undefined
-
-      // Create entry
       const entry: JournalEntry = {
         id: `entry_${Date.now()}`,
         mood: selectedMood,
         text: journalText,
         tags: selectedTags.length > 0 ? selectedTags : undefined,
-        aiInsight: aiInsight,
+        emotions: selectedEmotions.length > 0 ? selectedEmotions : undefined,
+        sleep: selectedSleep.length > 0 ? selectedSleep : undefined,
+        healthActivities: selectedHealth.length > 0 ? selectedHealth : undefined,
+        hobbies: selectedHobbies.length > 0 ? selectedHobbies : undefined,
+        quickNote: quickNote || undefined,
+        aiInsight,
         timestamp: Date.now(),
         createdAt: new Date().toISOString(),
       };
 
-      // Save to storage
       await JournalStorage.saveEntry(entry);
 
-      // Analyze mood and recommend breathing exercise if needed
       const recommendation = MoodAnalysisService.analyzeEntry(entry);
       setBreathingRecommendation(recommendation);
 
-      if (shouldAnalyze) {
-        Toast.show({
-          type: "success",
-          text1: "Reflection saved with AI sparkle",
-          text2: "Head to your entry for the full breakdown.",
-        });
-      } else {
-        Toast.show({
-          type: "success",
-          text1: "Reflection saved",
-          text2: "Thanks for checking in today.",
-        });
-      }
+      // Clear Redux draft
+      dispatch(resetDraft());
 
-      // Show breathing recommendation if suggested
+      Toast.show({
+        type: "success",
+        text1: shouldAnalyze ? "Reflection saved with AI sparkle" : "Reflection saved",
+        text2: shouldAnalyze ? "Head to your entry for the full breakdown." : "Thanks for checking in today.",
+      });
+
       if (recommendation.suggested) {
-        // Small delay to let success toast show first
-        setTimeout(() => {
-          Alert.alert(
-            "🧘 Breathing Exercise",
-            recommendation.reason,
-            [
-              {
-                text: "Maybe later",
-                style: "cancel",
-              },
-              {
-                text: "Start Session",
-                style: "default",
-                onPress: () => {
-                  const params: Record<string, string> = {};
-                  if (recommendation.journalEntryId) {
-                    params.journalEntryId = recommendation.journalEntryId;
-                  }
-                  if (recommendation.mood) {
-                    params.mood = recommendation.mood;
-                  }
-                  if (recommendation.emotion) {
-                    params.emotion = recommendation.emotion;
-                  }
-                  if (recommendation.duration) {
-                    params.duration = recommendation.duration.toString();
-                  }
-                  router.push({
-                    pathname: "/(home)/(tabs)/breathing",
-                    params,
-                  });
-                },
-              },
-            ],
-            { cancelable: true }
-          );
-        }, 500);
+        showBreathingAlert(recommendation);
       }
 
-      // Reset form before navigating away
-      setSelectedMood(null);
-      setJournalText("");
-      setSelectedTags([]);
-
-      // Navigate to entry detail screen to show full entry and AI insights
       router.push(`/(home)/entry-detail?id=${entry.id}`);
     } catch (error) {
       Toast.show({
@@ -267,11 +617,30 @@ function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    selectedMood,
+    journalText,
+    selectedTags,
+    selectedEmotions,
+    selectedSleep,
+    selectedHealth,
+    selectedHobbies,
+    quickNote,
+    handleAICheck,
+    generateAIInsight,
+    showBreathingAlert,
+    router,
+    dispatch,
+  ]);
+
+  const isFormValid = useMemo(
+    () => selectedMood !== null && journalText.trim().length > 0,
+    [selectedMood, journalText]
+  );
 
   return (
     <ScrollView
-      contentContainerStyle={[styles.container]}
+      contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}>
       <StatusBar style="dark" />
@@ -281,96 +650,33 @@ function Dashboard() {
         end={{ x: 1, y: 1 }}
         style={styles.gradientBackground}>
         <Box padding="m" paddingTop="xxxl">
-          {/* Header Section */}
+          {/* Header */}
           <Box marginBottom="xl">
-            <Text variant="default" marginBottom="xs" textAlign={"center"} color="textDefault" style={styles.mainTitle}>
+            <Text
+              variant="h2-pacifico"
+              marginBottom="xs"
+              textAlign="center"
+              color="textDefault"
+              style={styles.mainTitle}>
               {headerTitle}
             </Text>
-            <Text variant="default" color="black" textAlign={"center"}>
+            <Text variant="default" color="black" textAlign="center">
               {headerSubtitle}
             </Text>
           </Box>
 
-          {/* Breathing Recommendation Banner (if suggested based on mood/text) */}
+          {/* Breathing Recommendation Banner */}
           {breathingRecommendation?.suggested && !isLoading && (
-            <Box marginBottom="m">
-              <TouchableOpacity
-                onPress={() => {
-                  const params: Record<string, string> = {};
-                  if (breathingRecommendation?.journalEntryId) {
-                    params.journalEntryId = breathingRecommendation.journalEntryId;
-                  }
-                  if (breathingRecommendation?.mood) {
-                    params.mood = breathingRecommendation.mood;
-                  }
-                  if (breathingRecommendation?.emotion) {
-                    params.emotion = breathingRecommendation.emotion;
-                  }
-                  if (breathingRecommendation?.duration) {
-                    params.duration = breathingRecommendation.duration.toString();
-                  }
-                  router.push({
-                    pathname: "/(home)/(tabs)/breathing",
-                    params,
-                  });
-                }}
-                activeOpacity={0.8}>
-                <LinearGradient
-                  colors={["#FFF9E6", "#FFF4D6"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.recommendationBanner}>
-                  <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-                    <Box flex={1}>
-                      <Text variant="h6" style={styles.recommendationTitle}>
-                        🧘 Try Breathing Exercise
-                      </Text>
-                      <Text variant="h7" style={styles.recommendationText}>
-                        {breathingRecommendation.reason}
-                      </Text>
-                    </Box>
-                    <MaterialIcons name="arrow-forward" size={20} color="#F1C21B" />
-                  </Box>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Box>
+            <BreathingBanner
+              recommendation={breathingRecommendation}
+              onPress={() => navigateToBreathing(breathingRecommendation)}
+            />
           )}
 
-          {/* Mood Selector - Clean Minimal Design */}
-          <Box marginBottom="xl" alignItems="center">
-            <Box flexDirection="row" justifyContent="space-between" width="100%" paddingHorizontal="xs">
-              {MOOD_EMOJIS.map(mood => {
-                const isSelected = selectedMood === mood;
-                return (
-                  <AnimatedTouchable
-                    key={mood}
-                    onPress={() => {
-                      setSelectedMood(mood);
-                      // Analyze mood for recommendation
-                      const recommendation = MoodAnalysisService.analyzeMood(mood);
-                      setBreathingRecommendation(recommendation.suggested ? recommendation : null);
-                    }}
-                    style={[styles.moodButton, isSelected && styles.moodButtonSelected]}>
-                    {isSelected ? (
-                      <LinearGradient
-                        colors={["#9BA7F5", "#7DDAC0"]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.moodButtonGradient}>
-                        <Text style={styles.moodEmoji}>{mood}</Text>
-                      </LinearGradient>
-                    ) : (
-                      <Box style={styles.moodButtonUnselected}>
-                        <Text style={styles.moodEmojiUnselected}>{mood}</Text>
-                      </Box>
-                    )}
-                  </AnimatedTouchable>
-                );
-              })}
-            </Box>
-          </Box>
+          {/* Mood Selector */}
+          <MoodSelector selectedMood={selectedMood} onSelect={handleMoodSelect} />
 
-          {/* Journal Input - Modern Design */}
+          {/* Journal Input */}
           <Box marginBottom="xl">
             <Text variant="h5" marginBottom="s" color="textDefault" style={styles.sectionTitle}>
               Write your thoughts
@@ -385,29 +691,7 @@ function Dashboard() {
                   placeholder="What's on your mind today?..."
                   placeholderTextColor="#A7A7A7"
                   value={journalText}
-                  onChangeText={(text: string) => {
-                    setJournalText(text);
-                    // Analyze in real-time for recommendation (if mood selected)
-                    if (selectedMood && text.trim().length > 10) {
-                      const tempEntry: JournalEntry = {
-                        id: "temp",
-                        mood: selectedMood,
-                        text: text,
-                        timestamp: Date.now(),
-                        createdAt: new Date().toISOString(),
-                      };
-                      const recommendation = MoodAnalysisService.analyzeEntry(tempEntry);
-                      setBreathingRecommendation(recommendation.suggested ? recommendation : null);
-                    } else {
-                      // Check mood only
-                      if (selectedMood) {
-                        const recommendation = MoodAnalysisService.analyzeMood(selectedMood);
-                        setBreathingRecommendation(recommendation.suggested ? recommendation : null);
-                      } else {
-                        setBreathingRecommendation(null);
-                      }
-                    }
-                  }}
+                  onChangeText={handleTextChange}
                   multiline
                   style={styles.textInput}
                   textAlignVertical="top"
@@ -416,16 +700,13 @@ function Dashboard() {
             </Box>
           </Box>
 
-          {/* Tags - Modern Pill Design */}
-          <Box marginBottom="m">
-            <Text variant="h5" marginBottom="m" color="textDefault" style={styles.sectionTitle}>
-              Tags <Text style={styles.optionalText}>(optional)</Text>
-            </Text>
+          {/* Tags */}
+          <CollapsibleSection title="Tags" expanded={tagsExpanded} onToggle={() => setTagsExpanded(!tagsExpanded)}>
             <Box flexDirection="row" flexWrap="wrap" gap="s">
-              {availableTags.map(tag => {
+              {AVAILABLE_TAGS.map(tag => {
                 const isSelected = selectedTags.includes(tag);
                 return (
-                  <TouchableOpacity key={tag} onPress={() => toggleTag(tag)} activeOpacity={0.7}>
+                  <TouchableOpacity key={tag} onPress={() => handleToggleTag(tag)} activeOpacity={0.7}>
                     {isSelected ? (
                       <LinearGradient
                         colors={["#9B87F5", "#7DD3C0"]}
@@ -433,13 +714,13 @@ function Dashboard() {
                         end={{ x: 1, y: 0 }}
                         style={styles.tagButtonSelected}>
                         <Text variant="h6" style={styles.tagTextSelected}>
-                          {tag.charAt(0).toUpperCase() + tag.slice(1)}
+                          {capitalizeFirst(tag)}
                         </Text>
                       </LinearGradient>
                     ) : (
                       <Box style={styles.tagButton}>
                         <Text variant="h6" color="textDefault" style={styles.tagText}>
-                          {tag.charAt(0).toUpperCase() + tag.slice(1)}
+                          {capitalizeFirst(tag)}
                         </Text>
                       </Box>
                     )}
@@ -447,53 +728,110 @@ function Dashboard() {
                 );
               })}
             </Box>
-          </Box>
-          <TouchableOpacity
-            onPress={handleSaveEntry}
-            disabled={isLoading || !selectedMood || !journalText.trim()}
-            activeOpacity={0.8}
-            style={[
-              styles.saveButton,
-              (isLoading || !selectedMood || !journalText.trim()) && styles.saveButtonDisabled,
-            ]}>
-            <LinearGradient
-              colors={selectedMood && journalText.trim() ? ["#9B87F5", "#7DD3C0"] : ["#D3D3D3", "#B8B8B8"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.saveButtonGradient}>
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text variant="button" style={styles.saveButtonText}>
-                  {isPremium || remainingAI > 0 ? "Save & Analyze ✨" : "Save Entry"}
-                </Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-          {!isPremium && remainingAI >= 0 && (
-            <Box marginTop="m" alignItems="flex-end" marginBottom={"s"}>
-              <Box
-                flexDirection="row"
-                justifyContent="space-between"
-                flex={1}
-                paddingHorizontal="m"
-                paddingVertical="xs"
-                borderRadius="m"
-                style={{
-                  backgroundColor: theme.colors.backgroundHovered,
-                  borderWidth: 1,
-                  borderColor: theme.colors.primary,
-                }}>
-                <Text variant="h7" color="primary" textAlign="center">
-                  {remainingAI > 0
-                    ? `✨ ${remainingAI} AI analysis${remainingAI === 1 ? "" : "es"} remaining today`
-                    : "✨ AI analyses used up today"}
-                </Text>
-              </Box>
-            </Box>
-          )}
+          </CollapsibleSection>
 
-          {/* Saved Entry Confirmation (when no AI insight) */}
+          {/* Emotions Section */}
+          <CollapsibleSection
+            title="Emotions"
+            expanded={emotionsExpanded}
+            onToggle={() => setEmotionsExpanded(!emotionsExpanded)}>
+            <Box flexDirection="row" flexWrap="wrap" gap="s">
+              {EMOTION_OPTIONS.map(emotion => (
+                <OptionButton
+                  key={emotion.id}
+                  id={emotion.id}
+                  label={emotion.label}
+                  icon={emotion.icon}
+                  isSelected={selectedEmotions.includes(emotion.id)}
+                  onPress={() => handleToggleEmotion(emotion.id)}
+                />
+              ))}
+            </Box>
+          </CollapsibleSection>
+
+          {/* Sleep Section */}
+          <CollapsibleSection title="Sleep" expanded={sleepExpanded} onToggle={() => setSleepExpanded(!sleepExpanded)}>
+            <Box flexDirection="row" flexWrap="wrap" gap="s">
+              {SLEEP_OPTIONS.map(sleep => (
+                <OptionButton
+                  key={sleep.id}
+                  id={sleep.id}
+                  label={sleep.label}
+                  icon={sleep.icon}
+                  isSelected={selectedSleep.includes(sleep.id)}
+                  onPress={() => handleToggleSleep(sleep.id)}
+                />
+              ))}
+            </Box>
+          </CollapsibleSection>
+
+          {/* Health Section */}
+          <CollapsibleSection
+            title="Health"
+            expanded={healthExpanded}
+            onToggle={() => setHealthExpanded(!healthExpanded)}>
+            <Box flexDirection="row" flexWrap="wrap" gap="s">
+              {HEALTH_OPTIONS.map(health => (
+                <OptionButton
+                  key={health.id}
+                  id={health.id}
+                  label={health.label}
+                  icon={health.icon}
+                  isSelected={selectedHealth.includes(health.id)}
+                  onPress={() => handleToggleHealth(health.id)}
+                />
+              ))}
+            </Box>
+          </CollapsibleSection>
+
+          {/* Hobbies Section */}
+          <CollapsibleSection
+            title="Hobbies"
+            expanded={hobbiesExpanded}
+            onToggle={() => setHobbiesExpanded(!hobbiesExpanded)}>
+            <Box flexDirection="row" flexWrap="wrap" gap="s">
+              {HOBBIES_OPTIONS.map(hobby => (
+                <OptionButton
+                  key={hobby.id}
+                  id={hobby.id}
+                  label={hobby.label}
+                  icon={hobby.icon}
+                  isSelected={selectedHobbies.includes(hobby.id)}
+                  onPress={() => handleToggleHobby(hobby.id)}
+                />
+              ))}
+            </Box>
+          </CollapsibleSection>
+
+          {/* Quick Note Section */}
+          <CollapsibleSection
+            title="Additional Note"
+            expanded={quickNoteExpanded}
+            onToggle={() => setQuickNoteExpanded(!quickNoteExpanded)}>
+            <Box borderRadius="xl" style={styles.textInputContainer} overflow="hidden">
+              <LinearGradient
+                colors={["#FFFFFF", "#F8F6FF"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.textInputGradient}>
+                <RNTextInput
+                  placeholder="Add a quick note..."
+                  placeholderTextColor="#A7A7A7"
+                  value={quickNote}
+                  onChangeText={handleQuickNoteChange}
+                  multiline
+                  style={styles.textInput}
+                  textAlignVertical="top"
+                />
+              </LinearGradient>
+            </Box>
+          </CollapsibleSection>
+
+          {/* Save Button */}
+          <NextOrSaveButton isLoading={isLoading} disabled={!isFormValid || isLoading} onPress={handleSaveEntry} />
+
+          {/* AI Usage Indicator */}
+          <AIUsageIndicator remainingAI={remainingAI} isPremium={isPremium} />
         </Box>
       </LinearGradient>
     </ScrollView>
@@ -513,9 +851,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.5,
   },
-  subtitle: {
-    fontSize: 16,
-  },
   sectionTitle: {
     fontWeight: "600",
     fontSize: 18,
@@ -525,7 +860,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "400",
   },
-  // Mood Selector Styles - Clean Minimal
   moodButton: {
     width: 50,
     height: 50,
@@ -565,7 +899,6 @@ const styles = StyleSheet.create({
   moodEmojiUnselected: {
     fontSize: 24,
   },
-  // Text Input Styles
   textInputContainer: {
     shadowColor: "#9B87F5",
     shadowOffset: { width: 0, height: 4 },
@@ -586,7 +919,6 @@ const styles = StyleSheet.create({
     minHeight: 150,
     fontFamily: "HankenGrotesk_400Regular",
   },
-  // Tag Styles
   tagButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -619,7 +951,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  // Save Button Styles
   saveButton: {
     borderRadius: 16,
     overflow: "hidden",
@@ -645,110 +976,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.5,
   },
-  // Saved Entry Card Styles (when no AI insight)
-  savedEntryCard: {
-    marginTop: 8,
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#9B87F5",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: "rgba(155, 135, 245, 0.15)",
-  },
-  savedEntryGradient: {
-    borderRadius: 24,
-  },
-  savedEntryTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#9B87F5",
-    letterSpacing: -0.5,
-  },
-  savedEntryTextContainer: {
-    backgroundColor: "rgba(248, 246, 255, 0.5)",
-    borderWidth: 1,
-    borderColor: "rgba(155, 135, 245, 0.1)",
-  },
-  savedEntryText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  // AI Insight Styles
-  insightCard: {
-    marginTop: 8,
-    borderRadius: 24,
-    overflow: "hidden",
-    shadowColor: "#9B87F5",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 12,
-    borderWidth: 2,
-    borderColor: "rgba(155, 135, 245, 0.2)",
-  },
-  insightGradient: {
-    borderRadius: 24,
-  },
-  insightTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#9B87F5",
-    letterSpacing: -0.5,
-  },
-  insightSection: {
-    backgroundColor: "rgba(248, 246, 255, 0.5)",
-    borderWidth: 1,
-    borderColor: "rgba(155, 135, 245, 0.1)",
-  },
-  insightLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  emotionText: {
-    fontSize: 28,
-    fontWeight: "700",
-    textTransform: "capitalize",
-  },
-  insightText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  suggestionBox: {
-    backgroundColor: "#FFF9E6",
-    borderWidth: 1,
-    borderColor: "rgba(241, 194, 27, 0.3)",
-  },
-  suggestionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#F1C21B",
-  },
-  quoteBox: {
-    overflow: "hidden",
-    borderRadius: 16,
-  },
-  quoteGradient: {
-    padding: 16,
-    borderRadius: 16,
-  },
-  quoteTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 8,
-  },
-  quoteText: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    fontStyle: "italic",
-    lineHeight: 24,
-  },
-  // Recommendation Banner Styles
   recommendationBanner: {
     borderRadius: 16,
     padding: 16,
@@ -770,6 +997,60 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#856A1A",
     lineHeight: 18,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  collapseIcon: {
+    fontSize: 20,
+    color: "#9B87F5",
+    fontWeight: "300",
+  },
+  photoButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#E5E5E5",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  photoButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  voiceMemoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#E5E5E5",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  voiceMemoText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 

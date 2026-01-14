@@ -30,17 +30,27 @@ function BottomTab() {
         name="dashboard"
         options={{
           title: "Journal",
+          tabBarLabelStyle: {
+            fontSize: 13,
+            fontStyle: "normal" as const,
+            fontFamily: AppFonts.Pacifico,
+          },
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="edit-note" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="calendar"
         options={{
-          title: "History",
+          title: "Calendar",
+          tabBarLabelStyle: {
+            fontSize: 13,
+            fontStyle: "normal" as const,
+            fontFamily: AppFonts.Pacifico,
+          },
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="history" size={size} color={color} />
+            <MaterialIcons name="calendar-month" size={size} color={color} />
           ),
         }}
       />
@@ -48,6 +58,11 @@ function BottomTab() {
         name="trends"
         options={{
           title: "Trends",
+          tabBarLabelStyle: {
+            fontSize: 13,
+            fontStyle: "normal" as const,
+            fontFamily: AppFonts.Pacifico,
+          },
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="insights" size={size} color={color} />
           ),
@@ -57,6 +72,11 @@ function BottomTab() {
         name="breathing"
         options={{
           title: "Breathe",
+          tabBarLabelStyle: {
+            fontSize: 13,
+            fontStyle: "normal" as const,
+            fontFamily: AppFonts.Pacifico,
+          },
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="self-improvement" size={size} color={color} />
           ),
@@ -66,6 +86,11 @@ function BottomTab() {
         name="settings"
         options={{
           title: "Settings",
+          tabBarLabelStyle: {
+            fontSize: 13,
+            fontStyle: "normal" as const,
+            fontFamily: AppFonts.Pacifico,
+          },
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="settings" size={size} color={color} />
           ),

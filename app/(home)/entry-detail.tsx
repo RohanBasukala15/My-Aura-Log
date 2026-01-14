@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { ScrollView, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import moment from "moment";
 
-import { Box, Text, useTheme } from "@common/components/theme";
+import { Box, Text } from "@common/components/theme";
 import { JournalEntry, MOOD_VALUES } from "@common/models/JournalEntry";
 import { JournalStorage } from "@common/services/journalStorage";
 import { MoodAnalysisService } from "@common/services/moodAnalysisService";
@@ -13,18 +13,11 @@ import Toast from "react-native-toast-message";
 import { MaterialIcons } from "@expo/vector-icons";
 
 function EntryDetail() {
-  const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [entry, setEntry] = useState<JournalEntry | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      loadEntry();
-    }
-  }, [id]);
-
-  const loadEntry = async () => {
+  const loadEntry = useCallback(async () => {
     try {
       if (!id) return;
       const entryData = await JournalStorage.getEntry(id);
@@ -34,17 +27,23 @@ function EntryDetail() {
         Toast.show({
           type: "error",
           text1: "Entry not found",
-        });
-        router.back();
-      }
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to load entry",
       });
       router.back();
     }
-  };
+  } catch (error) {
+    Toast.show({
+      type: "error",
+      text1: "Failed to load entry",
+    });
+    router.back();
+  }
+}, [id, router]);
+
+  useEffect(() => {
+    if (id) {
+      loadEntry();
+    }
+  }, [id, loadEntry]);
 
   const handleDeleteEntry = async () => {
     if (!entry) return;
@@ -151,6 +150,163 @@ function EntryDetail() {
             </Box>
           )}
 
+          {/* Emotions */}
+          {entry.emotions && entry.emotions.length > 0 && (
+            <Box marginBottom="xl">
+              <Text variant="h5" marginBottom="m" color="textDefault" style={styles.sectionTitle}>
+                Emotions
+              </Text>
+              <Box flexDirection="row" flexWrap="wrap" gap="s">
+                {entry.emotions.map((emotion) => {
+                  const emotionMap: Record<string, { icon: string; label: string }> = {
+                    happy: { icon: "🎈", label: "happy" },
+                    excited: { icon: "🎉", label: "excited" },
+                    grateful: { icon: "💚", label: "grateful" },
+                    relaxed: { icon: "🏝️", label: "relaxed" },
+                    content: { icon: "🙏", label: "content" },
+                    tired: { icon: "😴", label: "tired" },
+                    unsure: { icon: "❓", label: "unsure" },
+                    bored: { icon: "⚡", label: "bored" },
+                    anxious: { icon: "☁️", label: "anxious" },
+                    angry: { icon: "🌋", label: "angry" },
+                    stressed: { icon: "😰", label: "stressed" },
+                    sad: { icon: "💧", label: "sad" },
+                    desperate: { icon: "🆘", label: "desperate" },
+                  };
+                  const emotionData = emotionMap[emotion] || { icon: "✨", label: emotion };
+                  return (
+                    <LinearGradient
+                      key={emotion}
+                      colors={["#9BA7F5", "#7DD3C0"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.tagGradient}
+                    >
+                      <Text variant="h6" style={styles.tagText}>
+                        {emotionData.icon} {emotionData.label.charAt(0).toUpperCase() + emotionData.label.slice(1)}
+                      </Text>
+                    </LinearGradient>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+
+          {/* Sleep */}
+          {entry.sleep && entry.sleep.length > 0 && (
+            <Box marginBottom="xl">
+              <Text variant="h5" marginBottom="m" color="textDefault" style={styles.sectionTitle}>
+                Sleep
+              </Text>
+              <Box flexDirection="row" flexWrap="wrap" gap="s">
+                {entry.sleep.map((sleep) => {
+                  const sleepMap: Record<string, { icon: string; label: string }> = {
+                    "good-sleep": { icon: "💤", label: "good sleep" },
+                    "medium-sleep": { icon: "😴", label: "medium sleep" },
+                    "bad-sleep": { icon: "🛏️", label: "bad sleep" },
+                    "sleep-early": { icon: "🌙", label: "sleep early" },
+                  };
+                  const sleepData = sleepMap[sleep] || { icon: "💤", label: sleep };
+                  return (
+                    <LinearGradient
+                      key={sleep}
+                      colors={["#9BA7F5", "#7DD3C0"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.tagGradient}
+                    >
+                      <Text variant="h6" style={styles.tagText}>
+                        {sleepData.icon} {sleepData.label.charAt(0).toUpperCase() + sleepData.label.slice(1)}
+                      </Text>
+                    </LinearGradient>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+
+          {/* Health Activities */}
+          {entry.healthActivities && entry.healthActivities.length > 0 && (
+            <Box marginBottom="xl">
+              <Text variant="h5" marginBottom="m" color="textDefault" style={styles.sectionTitle}>
+                Health Activities
+              </Text>
+              <Box flexDirection="row" flexWrap="wrap" gap="s">
+                {entry.healthActivities.map((health) => {
+                  const healthMap: Record<string, { icon: string; label: string }> = {
+                    exercise: { icon: "🧘", label: "exercise" },
+                    "eat-healthy": { icon: "🥕", label: "eat healthy" },
+                    "drink-water": { icon: "💧", label: "drink water" },
+                    walk: { icon: "🚶", label: "walk" },
+                    sport: { icon: "🏃", label: "sport" },
+                    "short-exercise": { icon: "🏋️", label: "short exercise" },
+                  };
+                  const healthData = healthMap[health] || { icon: "🏋️", label: health };
+                  return (
+                    <LinearGradient
+                      key={health}
+                      colors={["#9BA7F5", "#7DD3C0"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.tagGradient}
+                    >
+                      <Text variant="h6" style={styles.tagText}>
+                        {healthData.icon} {healthData.label.charAt(0).toUpperCase() + healthData.label.slice(1)}
+                      </Text>
+                    </LinearGradient>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+
+          {/* Hobbies */}
+          {entry.hobbies && entry.hobbies.length > 0 && (
+            <Box marginBottom="xl">
+              <Text variant="h5" marginBottom="m" color="textDefault" style={styles.sectionTitle}>
+                Hobbies
+              </Text>
+              <Box flexDirection="row" flexWrap="wrap" gap="s">
+                {entry.hobbies.map((hobby) => {
+                  const hobbyMap: Record<string, { icon: string; label: string }> = {
+                    movies: { icon: "📺", label: "movies" },
+                    read: { icon: "📖", label: "read" },
+                    gaming: { icon: "🎮", label: "gaming" },
+                    relax: { icon: "🏖️", label: "relax" },
+                  };
+                  const hobbyData = hobbyMap[hobby] || { icon: "✨", label: hobby };
+                  return (
+                    <LinearGradient
+                      key={hobby}
+                      colors={["#9BA7F5", "#7DD3C0"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.tagGradient}
+                    >
+                      <Text variant="h6" style={styles.tagText}>
+                        {hobbyData.icon} {hobbyData.label.charAt(0).toUpperCase() + hobbyData.label.slice(1)}
+                      </Text>
+                    </LinearGradient>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+
+          {/* Quick Note */}
+          {entry.quickNote && entry.quickNote.trim().length > 0 && (
+            <Box marginBottom="xl">
+              <Text variant="h5" marginBottom="m" color="textDefault" style={styles.sectionTitle}>
+                Additional Note
+              </Text>
+              <Box padding="m" borderRadius="m" style={styles.insightSection}>
+                <Text variant="default" color="textDefault">
+                  {entry.quickNote}
+                </Text>
+              </Box>
+            </Box>
+          )}
+
           {/* AI Insights */}
           {entry.aiInsight && (
             <>
@@ -199,7 +355,7 @@ function EntryDetail() {
                     style={styles.quoteGradient}
                   >
                     <Text variant="default" style={styles.quoteText}>
-                      "{entry.aiInsight.quote}"
+                      &ldquo;{entry.aiInsight.quote}&rdquo;
                     </Text>
                   </LinearGradient>
                 </Box>
