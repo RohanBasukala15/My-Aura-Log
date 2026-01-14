@@ -169,6 +169,16 @@ const lightTheme = createTheme({
       fontStyle: "normal",
       fontFamily: "HankenGrotesk_400Regular",
     },
+    "h1-pacifico": {
+      fontSize: 42,
+      fontStyle: "normal",
+      fontFamily: "Pacifico",
+    },
+    "h2-pacifico": {
+      fontSize: 32,
+      fontStyle: "normal",
+      fontFamily: "Pacifico",
+    },
     h5: {
       fontSize: 16,
       fontStyle: "normal",

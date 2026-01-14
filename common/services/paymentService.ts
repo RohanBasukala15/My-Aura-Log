@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import { PremiumService } from "./premiumService";
 
 // Get RevenueCat API keys from environment variables
-// These will be set in .env file later
+// Set in .env file (or EAS secrets for production builds)
 const REVENUECAT_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS;
 const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID;
 
@@ -16,11 +16,15 @@ const REVENUECAT_API_KEY = Platform.select({
 /**
  * RevenueCat configuration constants
  *
- * PRODUCT_ID should match the store product identifier (App Store / Google Play)
+ * PRODUCT_IDs should match the store product identifiers (App Store / Google Play)
  * ENTITLEMENT_ID should match the entitlement configured in RevenueCat
+ * PACKAGE_IDENTIFIERs should match the package identifiers in RevenueCat offerings
  */
-const PRODUCT_ID = "premium_coffee";
+const PRODUCT_ID_LIFETIME = "premium_lifetime"; // One-time purchase
+const PRODUCT_ID_MONTHLY = "premium_monthly"; // Monthly subscription
 const ENTITLEMENT_ID = "premium";
+const PACKAGE_IDENTIFIER_LIFETIME = "lifetime"; // Optional: package identifier in RevenueCat
+const PACKAGE_IDENTIFIER_MONTHLY = "monthly"; // Optional: package identifier in RevenueCat
 
 export class PaymentService {
   private static isInitialized = false;
@@ -34,15 +38,28 @@ export class PaymentService {
       return true;
     }
 
-    if (!REVENUECAT_API_KEY) {
+    // Debug logging to verify API keys are loaded
+    const apiKey = REVENUECAT_API_KEY;
+    console.log('🔑 RevenueCat API Key check:', {
+      hasKey: !!apiKey,
+      keyLength: apiKey?.length,
+      platform: Platform.OS,
+      iosKey: !!REVENUECAT_API_KEY_IOS,
+      androidKey: !!REVENUECAT_API_KEY_ANDROID,
+    });
+
+    if (!apiKey) {
+      console.error('❌ RevenueCat API key is missing! Check your EAS secrets or .env file.');
       return false;
     }
 
     try {
-      await Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+      await Purchases.configure({ apiKey });
       this.isInitialized = true;
+      console.log('✅ RevenueCat initialized successfully');
       return true;
     } catch (error) {
+      console.error('❌ RevenueCat initialization failed:', error);
       return false;
     }
   }
@@ -55,9 +72,36 @@ export class PaymentService {
   }
 
   /**
-   * Purchase premium (one-time purchase)
+   * Helper method to get all available packages from all offerings
+   * Handles both offerings.current and offerings.all
    */
-  static async purchasePremium(): Promise<boolean> {
+  private static getAllAvailablePackages(offerings: Awaited<ReturnType<typeof Purchases.getOfferings>>): PurchasesPackage[] {
+    const packages: PurchasesPackage[] = [];
+
+    // First, try current offering
+    if (offerings.current?.availablePackages) {
+      packages.push(...offerings.current.availablePackages);
+    }
+
+    // Then, get packages from all offerings
+    if (offerings.all) {
+      Object.values(offerings.all).forEach((offering) => {
+        if (offering && 'availablePackages' in offering && Array.isArray(offering.availablePackages)) {
+          packages.push(...offering.availablePackages);
+        }
+      });
+    }
+
+    return packages;
+  }
+
+  /**
+   * Purchase premium package
+   * @param packageIdentifier - Optional: "lifetime" or "monthly". If not provided, uses first available package.
+   */
+  static async purchasePremium(packageIdentifier?: string): Promise<boolean> {
+    console.log('🔍 packageIdentifier:', packageIdentifier);
+    
     if (!this.isAvailable()) {
       throw new Error(
         "Payment service is not available. Please contact support at myauralog@gmail.com."
@@ -68,19 +112,47 @@ export class PaymentService {
       // Get available offerings
       const offerings = await Purchases.getOfferings();
 
-      if (!offerings.current) {
+      console.log('🔍🔍RevenueCat Offerings:', JSON.stringify(offerings, null, 2));
+
+      // Get all available packages from all offerings
+      const allPackages = this.getAllAvailablePackages(offerings);
+
+      if (allPackages.length === 0) {
         throw new Error("No offerings available. Please check your RevenueCat configuration.");
       }
 
-      // Find package by product identifier (store SKU)
-      let premiumPackage: PurchasesPackage | undefined = offerings.current.availablePackages.find(
-        (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_ID
-      );
+      let premiumPackage: PurchasesPackage | undefined;
+
+      // If package identifier is provided, try to find by identifier first
+      if (packageIdentifier) {
+        premiumPackage = allPackages.find(
+          (pkg: PurchasesPackage) => pkg.identifier === packageIdentifier
+        );
+      }
+
+      console.log('🔍 After identifier match:', premiumPackage);
+
+      // Fallback: find by product identifier
+      if (!premiumPackage) {
+        if (packageIdentifier === PACKAGE_IDENTIFIER_LIFETIME || packageIdentifier === "lifetime") {
+          premiumPackage = allPackages.find(
+            (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_ID_LIFETIME
+          );
+        } else if (packageIdentifier === PACKAGE_IDENTIFIER_MONTHLY || packageIdentifier === "monthly") {
+          premiumPackage = allPackages.find(
+            (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_ID_MONTHLY
+          );
+        }
+      }
+
+      console.log('🔍 After product ID match:', premiumPackage);
 
       // Fallback: use the first available package
-      if (!premiumPackage && offerings.current.availablePackages.length > 0) {
-        premiumPackage = offerings.current.availablePackages[0];
+      if (!premiumPackage && allPackages.length > 0) {
+        premiumPackage = allPackages[0];
       }
+
+      console.log('🔍🔍RevenueCat Final premiumPackage:', premiumPackage);
 
       if (!premiumPackage) {
         throw new Error("No packages available. Please configure products in RevenueCat.");
@@ -109,6 +181,24 @@ export class PaymentService {
       // Handle other errors
       throw new Error(error.message || "Purchase failed. Please try again.");
     }
+  }
+
+  /**
+   * Purchase lifetime premium (one-time purchase)
+   * Convenience method for purchasing the lifetime package
+   */
+  static async purchaseLifetime(): Promise<boolean> {
+    console.log('🔍 purchaseLifetime');
+    return this.purchasePremium(PACKAGE_IDENTIFIER_LIFETIME);
+  }
+
+  /**
+   * Purchase monthly subscription
+   * Convenience method for purchasing the monthly subscription
+   */
+  static async purchaseMonthly(): Promise<boolean> {
+    console.log('🔍 purchaseMonthly');
+    return this.purchasePremium(PACKAGE_IDENTIFIER_MONTHLY);
   }
 
   /**
@@ -168,24 +258,96 @@ export class PaymentService {
 
     try {
       const offerings = await Purchases.getOfferings();
-      return offerings.current?.availablePackages || [];
+      return this.getAllAvailablePackages(offerings);
     } catch (error) {
       return [];
     }
   }
 
+  /**
+   * Get a specific package by identifier
+   * @param packageIdentifier - Package identifier (e.g., "lifetime", "monthly", "$rc_lifetime", "$rc_monthly")
+   */
+  static async getPackage(packageIdentifier: string): Promise<PurchasesPackage | null> {
+    if (!this.isAvailable()) {
+      return null;
+    }
+
+    try {
+      const offerings = await Purchases.getOfferings();
+      const allPackages = this.getAllAvailablePackages(offerings);
+      
+      // Try to find by package identifier
+      let package_ = allPackages.find(
+        (pkg: PurchasesPackage) => pkg.identifier === packageIdentifier
+      );
+
+      // If not found, try to find by product identifier
+      if (!package_) {
+        if (packageIdentifier === PACKAGE_IDENTIFIER_LIFETIME || packageIdentifier === "lifetime") {
+          package_ = allPackages.find(
+            (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_ID_LIFETIME
+          );
+        } else if (packageIdentifier === PACKAGE_IDENTIFIER_MONTHLY || packageIdentifier === "monthly") {
+          package_ = allPackages.find(
+            (pkg: PurchasesPackage) => pkg.product.identifier === PRODUCT_ID_MONTHLY
+          );
+        }
+      }
+
+      return package_ || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get lifetime package
+   */
+  static async getLifetimePackage(): Promise<PurchasesPackage | null> {
+    return this.getPackage(PACKAGE_IDENTIFIER_LIFETIME);
+  }
+
+  /**
+   * Get monthly subscription package
+   */
+  static async getMonthlyPackage(): Promise<PurchasesPackage | null> {
+    return this.getPackage(PACKAGE_IDENTIFIER_MONTHLY);
+  }
+
+  /**
+   * Check if a package is a subscription
+   */
+  static isSubscriptionPackage(pkg: PurchasesPackage): boolean {
+    return pkg.product.identifier === PRODUCT_ID_MONTHLY;
+  }
+
+  /**
+   * Check if a package is a one-time purchase
+   */
+  static isLifetimePackage(pkg: PurchasesPackage): boolean {
+    return pkg.product.identifier === PRODUCT_ID_LIFETIME;
+  }
+
   private static hasPremiumAccess(customerInfo: CustomerInfo): boolean {
+    // Check if user has active entitlement (works for both subscription and one-time)
     const entitlementActive =
       customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined ||
       customerInfo.entitlements.all[ENTITLEMENT_ID] !== undefined;
 
-    const productPurchased =
-      customerInfo.allPurchaseDates?.[PRODUCT_ID] !== undefined ||
+    // Check for lifetime purchase (one-time)
+    const lifetimePurchased =
+      customerInfo.allPurchaseDates?.[PRODUCT_ID_LIFETIME] !== undefined ||
       customerInfo.nonSubscriptionTransactions.some(
-        (transaction: { productIdentifier: string }) => transaction.productIdentifier === PRODUCT_ID
+        (transaction: { productIdentifier: string }) => transaction.productIdentifier === PRODUCT_ID_LIFETIME
       );
 
-    return entitlementActive || productPurchased;
+    // Check for monthly subscription (active subscription)
+    const monthlySubscribed =
+      customerInfo.allPurchaseDates?.[PRODUCT_ID_MONTHLY] !== undefined ||
+      customerInfo.activeSubscriptions.includes(PRODUCT_ID_MONTHLY);
+
+    return entitlementActive || lifetimePurchased || monthlySubscribed;
   }
 }
 

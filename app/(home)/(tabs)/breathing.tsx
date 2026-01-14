@@ -508,7 +508,7 @@ function Breathing() {
         <Box flex={1} justifyContent="center" alignItems="center" padding="m" paddingTop="xxxl">
           {/* Header */}
           <Box position="absolute" top={60} left={0} right={0} alignItems="center">
-            <Text variant="h2" textAlign="center" style={styles.title}>
+            <Text variant="h2-pacifico" textAlign="center" style={styles.title}>
               Guided Breathing
             </Text>
             <Text variant="default" textAlign="center" style={styles.subtitle}>

@@ -25,6 +25,10 @@ import {
 
 import { initI18Next } from "../../services/i18n";
 
+// Local font file
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const PacificoRegular = require("../theme/fonts/Pacifico-Regular.ttf");
+
 export type FontSource = Parameters<typeof Font.loadAsync>[0];
 const usePromiseAll = (
   promises: Promise<void | void[] | Asset[]>[],
@@ -68,6 +72,7 @@ export const appFonts = Object.freeze({
   HankenGrotesk_700Bold_Italic,
   HankenGrotesk_800ExtraBold_Italic,
   HankenGrotesk_900Black_Italic,
+  Pacifico: PacificoRegular,
 });
 
 export enum AppFonts {
@@ -89,4 +94,5 @@ export enum AppFonts {
   Bold_Italic_700 = "HankenGrotesk_700Bold_Italic",
   ExtraBold_Italic_800 = "HankenGrotesk_800ExtraBold_Italic",
   Black_Italic_900 = "HankenGrotesk_900Black_Italic",
+  Pacifico = "Pacifico",
 }

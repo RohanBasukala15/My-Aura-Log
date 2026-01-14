@@ -26,7 +26,7 @@ const appConfigurationSlice = createSlice({
   name: "appConfiguration",
   initialState,
   reducers: {
-    setOnboardingComplete: (state) => {
+    setOnboardingComplete: state => {
       state.isOnboardingCompleted = true;
       // we'll be ignoring the promise, its done this way not to block the user
       Storage.setItem(AppConstants.StorageKey.onboardingState, true).then().catch();
@@ -45,16 +45,16 @@ const appConfigurationSlice = createSlice({
       state.isBiometricSetupRequired = action.payload;
     },
 
-    onUIReady: (state) => {
+    onUIReady: state => {
       state.isUIReady = true;
     },
 
-    resetState: (state) => {
+    resetState: state => {
       state.error = undefined;
       state.appSession = undefined;
     },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
       .addCase(loadConfiguration.fulfilled, (state, action) => {
         state.ready = true;
@@ -72,16 +72,26 @@ const appConfigurationSlice = createSlice({
       .addCase(changeLanguage.fulfilled, (state, action) => {
         state.appLanguage = action.payload;
       })
-      .addCase(registerDevice.pending, (state) => {
+      .addCase(registerDevice.pending, state => {
         state.fcmTokenState = "pending";
       })
-      .addCase(registerDevice.fulfilled, (state) => {
+      .addCase(registerDevice.fulfilled, state => {
         state.fcmTokenState = "registered";
       })
-      .addCase(registerDevice.rejected, (state) => {
+      .addCase(registerDevice.rejected, state => {
         state.fcmTokenState = undefined;
       });
   },
 });
 
+export const {
+  setOnboardingComplete,
+  setAppSession,
+  setRememberUser,
+  setBiometricScreenDismissed,
+  onUIReady,
+  resetState,
+} = appConfigurationSlice.actions;
+
 export default appConfigurationSlice;
+

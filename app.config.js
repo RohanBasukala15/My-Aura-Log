@@ -79,7 +79,7 @@ module.exports = ({ config }) => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
-      buildNumber: "2",
+      buildNumber: "3",
     },
     android: {
       adaptiveIcon: {
@@ -87,7 +87,11 @@ module.exports = ({ config }) => {
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
-      versionCode: 2,
+      versionCode: 3,
+      permissions: ["android.permission.CAMERA"],
+      privacy: {
+        privacyPolicy: "https://rohanbasukala15.github.io/My-Aura-Log/privacy-policy.html",
+      },
     },
     plugins: [
       ["expo-build-properties", { android: { usesCleartextTraffic } }],

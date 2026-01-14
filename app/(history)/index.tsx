@@ -20,29 +20,37 @@ import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from "@rea
 
 import { Box, Text, useTheme } from "@common/components/theme";
 import { JournalStorage } from "@common/services/journalStorage";
-import { BreathingStorage } from "@common/services/breathingStorage";
 import { Storage } from "@common/services/Storage";
-import { EncryptedStorage } from "@common/services/EncryptedStorage";
 import { PremiumService } from "@common/services/premiumService";
 import { PaymentService } from "@common/services/paymentService";
 import { ReferralService } from "@common/services/referralService";
-import { NotificationService } from "@common/services/notificationService";
-import AppConstants from "@common/assets/AppConstants";
-import { resetState } from "@common/redux/actions";
-import { store } from "@common/redux/store";
 
 import { PremiumSection } from "@common/screens/settings/PremiumSection";
 import { NotificationsSection } from "@common/screens/settings/NotificationsSection";
 import { DangerZoneSection } from "@common/screens/settings/DangerZoneSection";
 import { LegalSection } from "@common/screens/settings/LegalSection";
 
-const {
-  NOTIFICATION_ENABLED_KEY,
-  NOTIFICATION_TIME_KEY,
-  DEFAULT_NOTIFICATION_TIME,
-  createDateFromTimeString,
-  formatDateToTimeString,
-} = NotificationService;
+const NOTIFICATION_ENABLED_KEY = "myauralog_notifications_enabled";
+const NOTIFICATION_TIME_KEY = "myauralog_notification_time";
+const DEFAULT_NOTIFICATION_TIME = "09:00";
+
+const createDateFromTimeString = (time: string) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  const date = new Date();
+  date.setHours(
+    Number.isFinite(hours) ? hours : 9,
+    Number.isFinite(minutes) ? minutes : 0,
+    0,
+    0
+  );
+  return date;
+};
+
+const formatDateToTimeString = (date: Date) => {
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
 
 function Settings() {
   const theme = useTheme();
@@ -59,59 +67,125 @@ function Settings() {
   const [referralCodeInput, setReferralCodeInput] = useState("");
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [iosTimePickerValue, setIosTimePickerValue] = useState<Date>(() =>
-    createDateFromTimeString(DEFAULT_NOTIFICATION_TIME)
-  );
-  const [userName, setUserName] = useState<string>("");
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState("");
-  const [lifetimePrice, setLifetimePrice] = useState<string>();
-  const [monthlyPrice, setMonthlyPrice] = useState<string>();
+  const [iosTimePickerValue, setIosTimePickerValue] = useState<Date>(() => createDateFromTimeString(DEFAULT_NOTIFICATION_TIME));
   const isInitialLoad = useRef(true);
 
   // Define scheduleDailyNotification first so it can be used in loadSettings
-  const scheduleDailyNotification = useCallback(
-    async (time: string) => {
-      return NotificationService.scheduleDailyNotification(time, userName);
-    },
-    [userName]
-  );
+  const scheduleDailyNotification = useCallback(async (time: string) => {
+    try {
+      // Cancel any existing notifications first
+      await Notifications.cancelAllScheduledNotificationsAsync();
 
-  const requestPermissions = useCallback(async () => {
-    const granted = await NotificationService.requestNotificationPermissions();
-    if (!granted) {
-      Toast.show({
-        type: "info",
-        text1: "Notifications disabled",
-        text2: "Flip them back on in your device settings whenever you're ready.",
+      // Parse time
+      const [hours, minutes] = time.split(":").map(Number);
+
+      // Validate time
+      if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        throw new Error("Invalid time format");
+      }
+
+      // Schedule daily notification
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Daily Aura Check-In ✨",
+          body: "Take a mindful pause and capture today's mood in your journal.",
+          sound: true,
+          data: { type: "daily_reminder" },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: hours,
+          minute: minutes,
+        },
       });
+
+      return notificationId;
+    } catch (error) {
+      throw error;
     }
-    return granted;
   }, []);
 
-  const loadPackagePrices = useCallback(async () => {
+  const requestPermissions = async () => {
     try {
-      if (!PaymentService.isAvailable()) {
-        return;
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
       }
 
-      const lifetimePkg = await PaymentService.getLifetimePackage();
-      const monthlyPkg = await PaymentService.getMonthlyPackage();
-
-      if (lifetimePkg) {
-        setLifetimePrice(lifetimePkg.product.priceString);
+      if (finalStatus !== "granted") {
+        Toast.show({
+          type: "info",
+          text1: "Notifications disabled",
+          text2: "Flip them back on in your device settings whenever you're ready.",
+        });
+        return false;
       }
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
 
-      if (monthlyPkg) {
-        setMonthlyPrice(monthlyPkg.product.priceString);
+  const loadSettings = async () => {
+    try {
+      const enabled = await Storage.getItem<boolean>(NOTIFICATION_ENABLED_KEY, false);
+      const time = await Storage.getItem<string>(NOTIFICATION_TIME_KEY, DEFAULT_NOTIFICATION_TIME);
+      const finalEnabled = enabled || false;
+      const finalTime = time || DEFAULT_NOTIFICATION_TIME;
+
+      setNotificationsEnabled(finalEnabled);
+      setNotificationTime(finalTime);
+      setIosTimePickerValue(createDateFromTimeString(finalTime));
+
+      // Restore notification schedule if it was enabled
+      if (finalEnabled) {
+        try {
+          await scheduleDailyNotification(finalTime);
+        } catch (error) {
+          // Silently fail - user can re-enable if needed
+        }
       }
     } catch (error) {
-      // Silently fail - will use default prices
-      console.log("Could not load package prices:", error);
+      // Silently fail - settings will use defaults
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      await loadSettings();
+      await requestPermissions();
+      await loadPremiumStatus();
+      isInitialLoad.current = false;
+    };
+    init();
+  }, [scheduleDailyNotification]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!isInitialLoad.current) {
+        loadPremiumStatus();
+      }
+    }, [])
+  );
+
+  // Pull to refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadPremiumStatus();
+      await loadSettings();
+    } catch (error) {
+      // Silently fail
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
-  const loadPremiumStatus = useCallback(async () => {
+  const loadPremiumStatus = async () => {
     try {
       // Check premium status (this will sync from Firebase if configured)
       const premium = await PremiumService.isPremium();
@@ -145,112 +219,7 @@ function Settings() {
         // Silently fail
       }
     }
-  }, []);
-
-  const loadUserName = useCallback(async () => {
-    try {
-      const name = await Storage.getItem<string>("user_name", "");
-      setUserName(name || "");
-      setNameInput(name || "");
-    } catch (error) {
-      // Silently fail
-    }
-  }, []);
-
-  const loadSettings = useCallback(async () => {
-    try {
-      const enabled = await Storage.getItem<boolean>(NOTIFICATION_ENABLED_KEY, false);
-      const time = await Storage.getItem<string>(NOTIFICATION_TIME_KEY, DEFAULT_NOTIFICATION_TIME);
-      const finalEnabled = enabled || false;
-      const finalTime = time || DEFAULT_NOTIFICATION_TIME;
-
-      setNotificationsEnabled(finalEnabled);
-      setNotificationTime(finalTime);
-      setIosTimePickerValue(createDateFromTimeString(finalTime));
-
-      // Restore notification schedule if it was enabled
-      if (finalEnabled) {
-        try {
-          await scheduleDailyNotification(finalTime);
-        } catch (error) {
-          // Silently fail - user can re-enable if needed
-        }
-      }
-    } catch (error) {
-      // Silently fail - settings will use defaults
-    }
-  }, [scheduleDailyNotification]);
-
-  useEffect(() => {
-    const init = async () => {
-      await loadSettings();
-      await loadUserName();
-      await requestPermissions();
-      await loadPremiumStatus();
-      await loadPackagePrices();
-      isInitialLoad.current = false;
-    };
-    init();
-  }, [loadSettings, loadUserName, loadPremiumStatus, loadPackagePrices, requestPermissions]);
-
-  // Refresh data when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      if (!isInitialLoad.current) {
-        loadPremiumStatus();
-        loadUserName();
-        loadPackagePrices();
-      }
-    }, [loadPremiumStatus, loadUserName, loadPackagePrices])
-  );
-
-  // Pull to refresh handler
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await loadPremiumStatus();
-      await loadSettings();
-      await loadUserName();
-    } catch (error) {
-      // Silently fail
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadSettings, loadPremiumStatus, loadUserName]);
-
-  const handleSaveName = useCallback(async () => {
-    const trimmedName = nameInput.trim();
-    if (!trimmedName) {
-      Toast.show({
-        type: "error",
-        text1: "Name can't be empty",
-        text2: "Please enter a name.",
-      });
-      return;
-    }
-
-    try {
-      await Storage.setItem("user_name", trimmedName);
-      setUserName(trimmedName);
-      setIsEditingName(false);
-      Toast.show({
-        type: "success",
-        text1: "Name updated! ✨",
-        text2: `We'll call you ${trimmedName} from now on.`,
-      });
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Couldn't save name",
-        text2: "Please try again.",
-      });
-    }
-  }, [nameInput]);
-
-  const handleCancelEditName = useCallback(() => {
-    setNameInput(userName);
-    setIsEditingName(false);
-  }, [userName]);
+  };
 
   const handleRestorePurchases = useCallback(async () => {
     setIsProcessingPayment(true);
@@ -281,7 +250,7 @@ function Settings() {
     }
   }, [loadPremiumStatus]);
 
-  const handleBuyLifetime = async () => {
+  const handleBuyPremium = async () => {
     // Check if payment service is available
     if (!PaymentService.isAvailable()) {
       Alert.alert(
@@ -292,85 +261,61 @@ function Settings() {
       return;
     }
 
-    setIsProcessingPayment(true);
-    try {
-      const success = await PaymentService.purchaseLifetime();
-      if (success) {
-        await loadPremiumStatus();
-        Toast.show({
-          type: "success",
-          text1: "Premium unlocked! 🎉",
-          text2: "Thanks for fueling the journey!",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: "Please try again in a moment.",
-        });
-      }
-    } catch (error: any) {
-      if (error.message === "Purchase cancelled") {
-        Toast.show({
-          type: "info",
-          text1: "Purchase canceled",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: error.message || "Please try again in a moment.",
-        });
-      }
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const handleBuyMonthly = async () => {
-    // Check if payment service is available
-    if (!PaymentService.isAvailable()) {
-      Alert.alert(
-        "Payment Unavailable",
-        "Payment service is not configured. Please add your RevenueCat API key to the .env file.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
-
-    setIsProcessingPayment(true);
-    try {
-      const success = await PaymentService.purchaseMonthly();
-      if (success) {
-        await loadPremiumStatus();
-        Toast.show({
-          type: "success",
-          text1: "Premium unlocked! 🎉",
-          text2: "Welcome to premium!",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: "Please try again in a moment.",
-        });
-      }
-    } catch (error: any) {
-      if (error.message === "Purchase cancelled") {
-        Toast.show({
-          type: "info",
-          text1: "Purchase canceled",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: error.message || "Please try again in a moment.",
-        });
-      }
-    } finally {
-      setIsProcessingPayment(false);
-    }
+    Alert.alert(
+      "Treat Yourself to Premium ☕",
+      "A one-time $5 thank-you unlocks the full studio:\n\n✨ Unlimited AI reflections\n✨ No daily cooldowns\n✨ Fuels future magic\n\nYour support means the world!",
+      [
+        {
+          text: "Maybe later",
+          style: "cancel",
+        },
+        {
+          text: "Unlock Premium ($5)",
+          style: "default",
+          onPress: async () => {
+            setIsProcessingPayment(true);
+            try {
+              const success = await PaymentService.purchasePremium();
+              if (success) {
+                await loadPremiumStatus();
+                Toast.show({
+                  type: "success",
+                  text1: "Premium unlocked! 🎉",
+                  text2: "Thanks for fueling the journey!",
+                });
+              } else {
+                Toast.show({
+                  type: "error",
+                  text1: "Purchase didn't go through",
+                  text2: "Please try again in a moment.",
+                });
+              }
+            } catch (error: any) {
+              if (error.message === "Purchase cancelled") {
+                Toast.show({
+                  type: "info",
+                  text1: "Purchase canceled",
+                });
+              } else {
+                Toast.show({
+                  type: "error",
+                  text1: "Purchase didn't go through",
+                  text2: error.message || "Please try again in a moment.",
+                });
+              }
+            } finally {
+              setIsProcessingPayment(false);
+            }
+          },
+        },
+        {
+          text: "Restore Purchases",
+          style: "default",
+          onPress: handleRestorePurchases,
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const handleInviteFriends = async () => {
@@ -433,11 +378,11 @@ function Settings() {
 
       try {
         await scheduleDailyNotification(newTime);
-        Toast.show({
-          type: "success",
-          text1: "Reminder refreshed",
-          text2: `We'll nudge you at ${newTime}.`,
-        });
+      Toast.show({
+        type: "success",
+        text1: "Reminder refreshed",
+        text2: `We'll nudge you at ${newTime}.`,
+      });
       } catch (error) {
         setNotificationTime(previousTime);
         setIosTimePickerValue(createDateFromTimeString(previousTime));
@@ -540,75 +485,23 @@ function Settings() {
   const handleClearData = () => {
     Alert.alert(
       "Clear All Data",
-      "This will delete ALL your data and reset the app to a fresh state. This includes:\n\n• All journal entries\n• All breathing sessions\n• All settings\n• Premium status\n• Referral data\n• User preferences\n\nThis action cannot be undone.",
+      "This will delete all your journal entries. This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Clear Everything",
+          text: "Clear All",
           style: "destructive",
           onPress: async () => {
             try {
-              // Clear all journal entries
               await JournalStorage.clearAllEntries();
-
-              // Clear all breathing sessions
-              await BreathingStorage.clearAllSessions();
-
-              // Clear notification settings
-              await Storage.removeItem(NotificationService.NOTIFICATION_ENABLED_KEY);
-              await Storage.removeItem(NotificationService.NOTIFICATION_TIME_KEY);
-
-              // Clear premium status and AI usage
-              await PremiumService.setPremiumStatus(false);
-              await PremiumService.resetDailyUsage();
-
-              // Clear referral data (except referral code which is permanent per device)
-              await Storage.removeItem("myauralog_referral_count");
-              await Storage.removeItem("myauralog_referral_premium_granted");
-              await Storage.removeItem("myauralog_referred_by");
-
-              // Clear onboarding state
-              await Storage.removeItem(AppConstants.StorageKey.onboardingState);
-
-              // Clear user data from onboarding
-              await Storage.removeItem("user_name");
-              await Storage.removeItem("daily_notifications");
-              await Storage.removeItem("biometric_enabled");
-              await Storage.removeItem("pin_enabled");
-
-              // Clear app session (encrypted storage)
-              await EncryptedStorage.removeItem(AppConstants.StorageKey.appSession);
-
-              // Clear remember user
-              await Storage.removeItem(AppConstants.StorageKey.rememberUser);
-
-              // Clear FCM tokens
-              await Storage.removeItem(AppConstants.StorageKey.fcmToken);
-              await Storage.removeItem(AppConstants.StorageKey.fcmRegistryCompleted);
-
-              // Clear language preference
-              await Storage.removeItem(AppConstants.StorageKey.appLanguage);
-
-              // Clear theme state
-              await Storage.removeItem("THEME_STATE_KEY");
-
-              // Cancel all scheduled notifications
-              await Notifications.cancelAllScheduledNotificationsAsync();
-
-              // Reset Redux state
-              resetState(store.dispatch);
-
               Toast.show({
                 type: "success",
                 text1: "All data cleared",
-                text2: "The app has been reset to a fresh state.",
               });
             } catch (error) {
-              console.error("Error clearing data:", error);
               Toast.show({
                 type: "error",
-                text1: "Failed to clear all data",
-                text2: "Some data may not have been cleared. Please try again.",
+                text1: "Failed to clear data",
               });
             }
           },
@@ -624,92 +517,9 @@ function Settings() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       <StatusBar style="dark" />
       <Box padding="m" paddingTop="xxxl">
-        <Text variant="h2-pacifico" textAlign={"center"} marginBottom="l" color="textDefault">
+        <Text variant="h2" textAlign={"center"} marginBottom="l" color="textDefault">
           Settings
         </Text>
-
-        {/* Profile Section */}
-        <Box
-          marginBottom="l"
-          padding="m"
-          borderRadius="m"
-          style={{
-            backgroundColor: theme.colors.white,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
-          }}>
-          <Text variant="h4" marginBottom="m" color="textDefault">
-            Profile
-          </Text>
-          {!isEditingName ? (
-            <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-              <Box flex={1}>
-                <Text variant="default" color="textSubdued" marginBottom="xs">
-                  Name
-                </Text>
-                <Text variant="h5" color="textDefault">
-                  {userName || "Not set"}
-                </Text>
-              </Box>
-              <TouchableOpacity
-                onPress={() => {
-                  setNameInput(userName);
-                  setIsEditingName(true);
-                }}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  borderRadius: 8,
-                  backgroundColor: theme.colors.backgroundHovered,
-                }}>
-                <Text variant="button" style={{ color: theme.colors.primary }}>
-                  Edit
-                </Text>
-              </TouchableOpacity>
-            </Box>
-          ) : (
-            <Box>
-              <Text variant="default" color="textSubdued" marginBottom="xs">
-                Name
-              </Text>
-              <TextInput
-                style={[
-                  styles.nameInput,
-                  {
-                    borderColor: theme.colors.borderSubdued,
-                    color: theme.colors.textDefault,
-                    backgroundColor: theme.colors.backgroundDefault,
-                  },
-                ]}
-                placeholder="Enter your name"
-                placeholderTextColor={theme.colors.textSubdued}
-                value={nameInput}
-                onChangeText={setNameInput}
-                autoFocus
-                maxLength={50}
-              />
-              <Box flexDirection="row" marginTop="s" gap="s">
-                <Box flex={1}>
-                  <TouchableOpacity onPress={handleCancelEditName} style={[styles.modalButton, styles.cancelButton]}>
-                    <Text variant="button" color="textDefault" textAlign="center">
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                </Box>
-                <Box flex={1}>
-                  <TouchableOpacity onPress={handleSaveName} style={[styles.modalButton, styles.applyButton]}>
-                    <Text variant="button" style={{ color: "#FFFFFF" }} textAlign="center">
-                      Save
-                    </Text>
-                  </TouchableOpacity>
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </Box>
 
         <PremiumSection
           isPremium={isPremium}
@@ -718,10 +528,7 @@ function Settings() {
           referralCode={referralCode}
           referralCount={referralCount}
           remainingReferrals={remainingReferrals}
-          lifetimePrice={lifetimePrice}
-          monthlyPrice={monthlyPrice}
-          onBuyLifetime={handleBuyLifetime}
-          onBuyMonthly={handleBuyMonthly}
+          onBuyPremium={handleBuyPremium}
           onRestorePurchases={handleRestorePurchases}
           onInviteFriends={handleInviteFriends}
           onOpenReferralModal={openReferralModal}
@@ -736,13 +543,14 @@ function Settings() {
 
         <DangerZoneSection onClearData={handleClearData} />
 
-
         <LegalSection appVersion="1.0.0" />
+
         {/* Contact Section */}
         <Box
           backgroundColor="white"
           borderRadius="l"
           padding="m"
+          marginTop="m"
           style={{
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
@@ -751,16 +559,18 @@ function Settings() {
             elevation: 2,
           }}>
           <Text variant="h3" marginBottom="xs" color="textDefault">
-            We&apos;d Love to Hear From You 💌
+            We'd Love to Hear From You 💌
           </Text>
           <Text variant="default" marginBottom="m" color="textSubdued">
-            Questions, ideas, or just want to share your thoughts? We&apos;re all ears.
+            Questions, ideas, or just want to share your thoughts? We're all ears.
           </Text>
           <TouchableOpacity
             onPress={async () => {
               const email = "myauralog@gmail.com";
               const subject = encodeURIComponent("My Aura Log Feedback");
-              const body = encodeURIComponent("Hi My Aura Log team,\n\nI wanted to reach out about...\n\n");
+              const body = encodeURIComponent(
+                "Hi My Aura Log team,\n\nI wanted to reach out about...\n\n"
+              );
               const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
 
               try {
@@ -854,12 +664,12 @@ function Settings() {
               shadowRadius: 8,
               elevation: 8,
             }}>
-            <Text variant="h3" marginBottom="m" color="textDefault" textAlign="center">
-              Enter a Vibe Code
-            </Text>
-            <Text variant="default" marginBottom="m" color="textSubdued" textAlign="center">
-              Got a friend&apos;s vibe code? Drop it here to boost their premium quest.
-            </Text>
+      <Text variant="h3" marginBottom="m" color="textDefault" textAlign="center">
+        Enter a Vibe Code
+      </Text>
+      <Text variant="default" marginBottom="m" color="textSubdued" textAlign="center">
+        Got a friend's vibe code? Drop it here to boost their premium quest.
+      </Text>
 
             <TextInput
               style={[
@@ -898,7 +708,7 @@ function Settings() {
                   if (!referralCodeInput || referralCodeInput.trim().length === 0) {
                     Toast.show({
                       type: "error",
-                      text1: "That code doesn&apos;t look right",
+                      text1: "That code doesn't look right",
                       text2: "Double-check it and try again.",
                     });
                     return;
@@ -954,13 +764,6 @@ function Settings() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-  },
-  nameInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    fontFamily: "HankenGrotesk_400Regular",
   },
   referralInput: {
     borderWidth: 1,

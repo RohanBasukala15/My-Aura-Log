@@ -14,20 +14,57 @@ const getOpenAIClient = () => {
     });
 };
 
+interface InsightContext {
+    tags?: string[];
+    emotions?: string[];
+    sleep?: string[];
+    healthActivities?: string[];
+    hobbies?: string[];
+    quickNote?: string;
+}
+
+/**
+ * Formats context data for AI prompt
+ */
+const formatContextForPrompt = (context: InsightContext): string => {
+    const sections: string[] = [];
+    
+    if (context.tags && context.tags.length > 0) {
+        sections.push(`Tags: ${context.tags.join(", ")}`);
+    }
+    if (context.emotions && context.emotions.length > 0) {
+        sections.push(`Emotions: ${context.emotions.join(", ")}`);
+    }
+    if (context.sleep && context.sleep.length > 0) {
+        sections.push(`Sleep: ${context.sleep.join(", ")}`);
+    }
+    if (context.healthActivities && context.healthActivities.length > 0) {
+        sections.push(`Health Activities: ${context.healthActivities.join(", ")}`);
+    }
+    if (context.hobbies && context.hobbies.length > 0) {
+        sections.push(`Hobbies: ${context.hobbies.join(", ")}`);
+    }
+    if (context.quickNote && context.quickNote.trim()) {
+        sections.push(`Additional Note: "${context.quickNote.trim()}"`);
+    }
+    
+    return sections.length > 0 ? sections.join("\n") : "No additional context provided";
+};
+
 export class OpenAIService {
     static async generateInsight(
         entryText: string,
         mood: MoodEmoji,
-        tags?: string[]
+        context?: InsightContext
     ): Promise<AIInsight> {
         const openai = getOpenAIClient();
         if (!openai) {
             // Return random mock data if API key is not set
-            return generateRandomInsight(mood, tags);
+            return generateRandomInsight(mood, context?.tags);
         }
 
         const moodLabel = MOOD_LABELS[mood] || mood;
-        const tagsText = tags && tags.length > 0 ? tags.join(", ") : "none";
+        const contextText = context ? formatContextForPrompt(context) : "No additional context provided";
 
         const prompt = `
 You are My Aura Log, an empathetic AI assistant helping users understand their emotions.
@@ -35,16 +72,18 @@ You are My Aura Log, an empathetic AI assistant helping users understand their e
 Analyze the following journal entry with full context:
 
 Mood: ${moodLabel} (${mood})
-Tags: ${tagsText}
-Thoughts: "${entryText}"
+Main Thoughts: "${entryText}"
 
-Consider the user's selected mood, the tags they've associated with this entry, and their written thoughts to provide a comprehensive and empathetic analysis. The mood reflects how they're feeling, the tags show what areas of life this relates to, and the thoughts contain the details of their experience.
+Additional Context:
+${contextText}
+
+Consider the user's selected mood, their written thoughts, and all additional context (tags, emotions, sleep, health activities, hobbies, and any additional notes) to provide a comprehensive and empathetic analysis. The mood reflects how they're feeling, the thoughts contain the core details of their experience, and the additional context provides deeper insight into their daily activities, emotional state, and lifestyle choices.
 
 Return JSON:
 {
   "emotion": "Primary emotion (happy, sad, calm, anxious, angry, etc.)",
-  "summary": "Brief compassionate summary that considers their mood, tags, and thoughts (max 35 words)",
-  "suggestion": "Short positive advice tailored to their situation based on mood, tags, and content (max 45 words)",
+  "summary": "Brief compassionate summary that considers their mood, thoughts, and all context (max 35 words)",
+  "suggestion": "Short positive advice tailored to their situation based on mood, thoughts, and all context (max 45 words)",
   "quote": "Uplifting quote or thought (max 25 words)"
 }
 `;
@@ -75,7 +114,7 @@ Return JSON:
             return insight;
         } catch (error) {
             // Return random fallback insight if API call fails
-            return generateRandomInsight(mood, tags);
+            return generateRandomInsight(mood, context?.tags);
         }
     }
 }

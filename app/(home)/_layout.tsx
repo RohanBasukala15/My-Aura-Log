@@ -19,6 +19,16 @@ function HomeLayout() {
           gestureDirection: "vertical",
         }}
       />
+      <Stack.Screen
+        name="entry-details"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_bottom",
+          headerShown: false,
+          gestureEnabled: true,
+          gestureDirection: "vertical",
+        }}
+      />
     </Stack>
   );
 }
