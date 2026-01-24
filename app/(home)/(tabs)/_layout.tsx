@@ -1,11 +1,13 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppFonts, useTheme } from "@common/components";
 
 function BottomTab() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const screenOptions = {
     headerShown: false,
@@ -13,6 +15,8 @@ function BottomTab() {
       elevation: 0,
       borderTopWidth: 0,
       backgroundColor: theme.colors.white,
+      paddingBottom: insets.bottom,
+      height: 60 + insets.bottom,
     },
     tabBarLabelStyle: {
       fontSize: 12,

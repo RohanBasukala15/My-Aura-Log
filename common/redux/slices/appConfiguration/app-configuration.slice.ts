@@ -15,6 +15,7 @@ interface AppConfiguration {
   isOnboardingCompleted?: boolean;
   rememberUser?: RememberUserState;
   isBiometricSetupRequired?: boolean;
+  biometricEnabled?: boolean;
   fcmTokenState?: "registered" | "pending";
 }
 
@@ -45,6 +46,14 @@ const appConfigurationSlice = createSlice({
       state.isBiometricSetupRequired = action.payload;
     },
 
+    setBiometricEnabled: (state, action: PayloadAction<boolean>) => {
+      state.biometricEnabled = action.payload;
+      // Persist to storage
+      Storage.setItem("biometric_enabled", action.payload).then().catch();
+      // If biometric is enabled, setup is required on next app launch
+      state.isBiometricSetupRequired = action.payload;
+    },
+
     onUIReady: state => {
       state.isUIReady = true;
     },
@@ -63,6 +72,7 @@ const appConfigurationSlice = createSlice({
         state.isOnboardingCompleted = action.payload?.isOnboardingCompleted;
         state.rememberUser = action.payload?.rememberUser;
         state.fcmTokenState = action.payload?.isFcmTokenRegistered ? "registered" : undefined;
+        state.biometricEnabled = action.payload?.biometricEnabled ?? false;
         state.isBiometricSetupRequired = action.payload?.isBiometricSetupRequired ?? false;
       })
       .addCase(loadConfiguration.rejected, (state, action) => {
@@ -89,6 +99,7 @@ export const {
   setAppSession,
   setRememberUser,
   setBiometricScreenDismissed,
+  setBiometricEnabled,
   onUIReady,
   resetState,
 } = appConfigurationSlice.actions;

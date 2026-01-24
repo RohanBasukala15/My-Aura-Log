@@ -23,6 +23,7 @@ export const loadConfiguration = createAsyncThunk<
     rememberUser?: RememberUserState;
     isFcmTokenRegistered?: boolean;
     isBiometricSetupRequired?: boolean;
+    biometricEnabled?: boolean;
   } | null,
   void
 >("appConfiguration/loadConfiguration", async (_, api) => {
@@ -37,6 +38,13 @@ export const loadConfiguration = createAsyncThunk<
   const fcmToken = await Storage.getItem<string>(AppConstants.StorageKey.fcmToken);
   const isFcmTokenRegistered = await Storage.getItem<boolean>(AppConstants.StorageKey.fcmRegistryCompleted);
 
+  // Load biometric enabled state
+  const biometricEnabled = await Storage.getItem<boolean>("biometric_enabled");
+  
+  // Determine if biometric setup is required
+  // If biometric is enabled and onboarding is completed, setup is required
+  const isBiometricSetupRequired = biometricEnabled === true && isOnboardingCompleted === true;
+
   if (fcmToken && !isFcmTokenRegistered && appSession?.access_token) {
     api.dispatch(registerDevice({ fcmToken }));
   }
@@ -47,6 +55,8 @@ export const loadConfiguration = createAsyncThunk<
     rememberUser: rememberUser ?? undefined,
     isFcmTokenRegistered: isFcmTokenRegistered ?? false,
     isOnboardingCompleted: isOnboardingCompleted ?? false,
+    biometricEnabled: biometricEnabled ?? false,
+    isBiometricSetupRequired: isBiometricSetupRequired,
   };
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Redirect } from "expo-router";
 
 import { ActivityIndicator, Box, useAppConfiguration } from "@common/components";
@@ -12,8 +12,8 @@ const LoadingScreen = () => (
 
 export default function EntryPoint() {
   const { isReady, isUIReady } = useAppConfiguration();
-  const isOnboardingCompleted = useAppSelector(
-    (state) => state.appConfiguration.isOnboardingCompleted
+  const { isOnboardingCompleted, isBiometricSetupRequired } = useAppSelector(
+    (state) => state.appConfiguration
   );
 
   if (!isReady || !isUIReady) {
@@ -23,6 +23,11 @@ export default function EntryPoint() {
   // Show onboarding if not completed, otherwise redirect to dashboard
   if (!isOnboardingCompleted) {
     return <Redirect href={"/(onboarding)"} />;
+  }
+
+  // If biometric is enabled and setup is required, show biometric login screen
+  if (isBiometricSetupRequired) {
+    return <Redirect href={"/(login-with-biometric)"} />;
   }
 
   // Redirect directly to dashboard (Journal Entry screen)

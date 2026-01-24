@@ -52,7 +52,7 @@ function PageView(props: PageViewProps) {
     <>
       <StatusBar style={statusBarStyle} />
 
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} >
         <Wrapper
           style={type === "View" ? [{ paddingHorizontal }, styles.container, style] : []}
           keyboardShouldPersistTaps="handled"
