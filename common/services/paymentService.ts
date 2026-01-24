@@ -40,23 +40,15 @@ export class PaymentService {
 
     // Debug logging to verify API keys are loaded
     const apiKey = REVENUECAT_API_KEY;
-    console.log('🔑 RevenueCat API Key check:', {
-      hasKey: !!apiKey,
-      keyLength: apiKey?.length,
-      platform: Platform.OS,
-      iosKey: !!REVENUECAT_API_KEY_IOS,
-      androidKey: !!REVENUECAT_API_KEY_ANDROID,
-    });
+
 
     if (!apiKey) {
-      console.error('❌ RevenueCat API key is missing! Check your EAS secrets or .env file.');
       return false;
     }
 
     try {
       await Purchases.configure({ apiKey });
       this.isInitialized = true;
-      console.log('✅ RevenueCat initialized successfully');
       return true;
     } catch (error) {
       console.error('❌ RevenueCat initialization failed:', error);
@@ -100,8 +92,7 @@ export class PaymentService {
    * @param packageIdentifier - Optional: "lifetime" or "monthly". If not provided, uses first available package.
    */
   static async purchasePremium(packageIdentifier?: string): Promise<boolean> {
-    console.log('🔍 packageIdentifier:', packageIdentifier);
-    
+    console.log('purchasePremium', packageIdentifier);
     if (!this.isAvailable()) {
       throw new Error(
         "Payment service is not available. Please contact support at myauralog@gmail.com."
@@ -111,8 +102,6 @@ export class PaymentService {
     try {
       // Get available offerings
       const offerings = await Purchases.getOfferings();
-
-      console.log('🔍🔍RevenueCat Offerings:', JSON.stringify(offerings, null, 2));
 
       // Get all available packages from all offerings
       const allPackages = this.getAllAvailablePackages(offerings);
@@ -130,7 +119,6 @@ export class PaymentService {
         );
       }
 
-      console.log('🔍 After identifier match:', premiumPackage);
 
       // Fallback: find by product identifier
       if (!premiumPackage) {
@@ -145,14 +133,12 @@ export class PaymentService {
         }
       }
 
-      console.log('🔍 After product ID match:', premiumPackage);
 
       // Fallback: use the first available package
       if (!premiumPackage && allPackages.length > 0) {
         premiumPackage = allPackages[0];
       }
 
-      console.log('🔍🔍RevenueCat Final premiumPackage:', premiumPackage);
 
       if (!premiumPackage) {
         throw new Error("No packages available. Please configure products in RevenueCat.");
@@ -188,8 +174,8 @@ export class PaymentService {
    * Convenience method for purchasing the lifetime package
    */
   static async purchaseLifetime(): Promise<boolean> {
-    console.log('🔍 purchaseLifetime');
-    return this.purchasePremium(PACKAGE_IDENTIFIER_LIFETIME);
+    console.log('purchaseLifetime');
+    return PaymentService.purchasePremium(PACKAGE_IDENTIFIER_LIFETIME);
   }
 
   /**
@@ -197,8 +183,7 @@ export class PaymentService {
    * Convenience method for purchasing the monthly subscription
    */
   static async purchaseMonthly(): Promise<boolean> {
-    console.log('🔍 purchaseMonthly');
-    return this.purchasePremium(PACKAGE_IDENTIFIER_MONTHLY);
+    return PaymentService.purchasePremium(PACKAGE_IDENTIFIER_MONTHLY);
   }
 
   /**

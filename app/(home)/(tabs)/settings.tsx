@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -15,6 +15,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "expo-router";
 import * as Notifications from "expo-notifications";
+import * as MailComposer from "expo-mail-composer";
 import Toast from "react-native-toast-message";
 import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from "@react-native-community/datetimepicker";
 
@@ -44,13 +45,24 @@ const {
   formatDateToTimeString,
 } = NotificationService;
 
+// Constants
+const CONTACT_EMAIL = "myauralog@gmail.com";
+const PAYMENT_UNAVAILABLE_MESSAGE = "Payment service is not configured. Please add your RevenueCat API key to the .env file.";
+
+// Toast helper functions
+const showToast = {
+  success: (text1: string, text2?: string) => Toast.show({ type: "success", text1, text2 }),
+  error: (text1: string, text2?: string) => Toast.show({ type: "error", text1, text2 }),
+  info: (text1: string, text2?: string) => Toast.show({ type: "info", text1, text2 }),
+};
+
 function Settings() {
   const theme = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState(DEFAULT_NOTIFICATION_TIME);
   const [isPremium, setIsPremium] = useState(false);
   const [remainingAI, setRemainingAI] = useState<number>(-1);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<"monthly" | "lifetime" | "restore" | null>(null);
   const [referralCount, setReferralCount] = useState(0);
   const [referralCode, setReferralCode] = useState<string>("");
   const [remainingReferrals, setRemainingReferrals] = useState(3);
@@ -80,11 +92,7 @@ function Settings() {
   const requestPermissions = useCallback(async () => {
     const granted = await NotificationService.requestNotificationPermissions();
     if (!granted) {
-      Toast.show({
-        type: "info",
-        text1: "Notifications disabled",
-        text2: "Flip them back on in your device settings whenever you're ready.",
-      });
+      showToast.info("Notifications disabled", "Flip them back on in your device settings whenever you're ready.");
     }
     return granted;
   }, []);
@@ -221,11 +229,7 @@ function Settings() {
   const handleSaveName = useCallback(async () => {
     const trimmedName = nameInput.trim();
     if (!trimmedName) {
-      Toast.show({
-        type: "error",
-        text1: "Name can't be empty",
-        text2: "Please enter a name.",
-      });
+      showToast.error("Name can't be empty", "Please enter a name.");
       return;
     }
 
@@ -233,17 +237,9 @@ function Settings() {
       await Storage.setItem("user_name", trimmedName);
       setUserName(trimmedName);
       setIsEditingName(false);
-      Toast.show({
-        type: "success",
-        text1: "Name updated! ✨",
-        text2: `We'll call you ${trimmedName} from now on.`,
-      });
+      showToast.success("Name updated! ✨", `We'll call you ${trimmedName} from now on.`);
     } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "Couldn't save name",
-        text2: "Please try again.",
-      });
+      showToast.error("Couldn't save name", "Please try again.");
     }
   }, [nameInput]);
 
@@ -253,135 +249,73 @@ function Settings() {
   }, [userName]);
 
   const handleRestorePurchases = useCallback(async () => {
-    setIsProcessingPayment(true);
+    setIsProcessingPayment("restore");
     try {
       const restored = await PaymentService.restorePurchases();
       if (restored) {
         await loadPremiumStatus();
-        Toast.show({
-          type: "success",
-          text1: "Premium restored! 🎉",
-          text2: "All set! Welcome back to the full experience.",
-        });
+        showToast.success("Premium restored! 🎉", "All set! Welcome back to the full experience.");
       } else {
-        Toast.show({
-          type: "info",
-          text1: "No past purchases spotted",
-          text2: "Looks like there's nothing to restore yet.",
-        });
+        showToast.info("No past purchases spotted", "Looks like there's nothing to restore yet.");
       }
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Couldn't restore purchases",
-        text2: error?.message || "Please try again in a moment.",
-      });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Please try again in a moment.";
+      showToast.error("Couldn't restore purchases", errorMessage);
     } finally {
-      setIsProcessingPayment(false);
+      setIsProcessingPayment(null);
     }
   }, [loadPremiumStatus]);
 
-  const handleBuyLifetime = async () => {
-    // Check if payment service is available
-    if (!PaymentService.isAvailable()) {
-      Alert.alert(
-        "Payment Unavailable",
-        "Payment service is not configured. Please add your RevenueCat API key to the .env file.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
+  // Generic purchase handler to reduce duplication
+  const handlePurchase = useCallback(
+    async (purchaseFn: () => Promise<boolean>, successMessage: string, paymentType: "monthly" | "lifetime") => {
+      if (!PaymentService.isAvailable()) {
+        Alert.alert("Payment Unavailable", PAYMENT_UNAVAILABLE_MESSAGE, [{ text: "OK" }]);
+        return;
+      }
 
-    setIsProcessingPayment(true);
+      setIsProcessingPayment(paymentType);
+      try {
+        const success = await purchaseFn();
+        if (success) {
+          await loadPremiumStatus();
+          showToast.success("Premium unlocked! 🎉", successMessage);
+        } else {
+          showToast.error("Purchase didn't go through", "Please try again in a moment.");
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Please try again in a moment.";
+        if (error instanceof Error && error.message === "Purchase cancelled") {
+          showToast.info("Purchase canceled");
+        } else {
+          showToast.error("Purchase didn't go through", errorMessage);
+        }
+      } finally {
+        setIsProcessingPayment(null);
+      }
+    },
+    [loadPremiumStatus]
+  );
+
+  const handleBuyLifetime = useCallback(() => {
+    handlePurchase(PaymentService.purchaseLifetime, "Thanks for fueling the journey!", "lifetime");
+  }, [handlePurchase]);
+
+  const handleBuyMonthly = useCallback(() => {
+    handlePurchase(PaymentService.purchaseMonthly, "Welcome to premium!", "monthly");
+  }, [handlePurchase]);
+
+  // Memoize share message to avoid recreating on every render
+  const shareMessage = useMemo(() => {
+    const urls = ReferralService.getAppStoreUrls();
+    const storeUrl = Platform.OS === "ios" ? urls.ios : urls.android;
+    return `I've been journaling with My Aura Log, an AI-powered mood studio I love. 🎨✨\n\nUse my referral code: ${referralCode}\nGrab it here:\n${storeUrl}\n\nWhen 3 friends join, we both unlock premium vibes! 🎉`;
+  }, [referralCode]);
+
+  const handleInviteFriends = useCallback(async () => {
     try {
-      const success = await PaymentService.purchaseLifetime();
-      if (success) {
-        await loadPremiumStatus();
-        Toast.show({
-          type: "success",
-          text1: "Premium unlocked! 🎉",
-          text2: "Thanks for fueling the journey!",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: "Please try again in a moment.",
-        });
-      }
-    } catch (error: any) {
-      if (error.message === "Purchase cancelled") {
-        Toast.show({
-          type: "info",
-          text1: "Purchase canceled",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: error.message || "Please try again in a moment.",
-        });
-      }
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const handleBuyMonthly = async () => {
-    // Check if payment service is available
-    if (!PaymentService.isAvailable()) {
-      Alert.alert(
-        "Payment Unavailable",
-        "Payment service is not configured. Please add your RevenueCat API key to the .env file.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
-
-    setIsProcessingPayment(true);
-    try {
-      const success = await PaymentService.purchaseMonthly();
-      if (success) {
-        await loadPremiumStatus();
-        Toast.show({
-          type: "success",
-          text1: "Premium unlocked! 🎉",
-          text2: "Welcome to premium!",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: "Please try again in a moment.",
-        });
-      }
-    } catch (error: any) {
-      if (error.message === "Purchase cancelled") {
-        Toast.show({
-          type: "info",
-          text1: "Purchase canceled",
-        });
-      } else {
-        Toast.show({
-          type: "error",
-          text1: "Purchase didn't go through",
-          text2: error.message || "Please try again in a moment.",
-        });
-      }
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const handleInviteFriends = async () => {
-    try {
-      const referralLink = await ReferralService.getReferralLink();
       const urls = ReferralService.getAppStoreUrls();
-
-      // Get the appropriate store URL based on platform
       const storeUrl = Platform.OS === "ios" ? urls.ios : urls.android;
-
-      const shareMessage = `I've been journaling with My Aura Log, an AI-powered mood studio I love. 🎨✨\n\nUse my referral code: ${referralCode}\nGrab it here:\n${storeUrl}\n\nWhen 3 friends join, we both unlock premium vibes! 🎉`;
 
       try {
         const result = await Share.share({
@@ -390,33 +324,21 @@ function Settings() {
         });
 
         if (result.action === Share.sharedAction) {
-          Toast.show({
-            type: "success",
-            text1: "Invite sent! 🎉",
-            text2: "Thanks for sharing the good energy!",
-          });
+          showToast.success("Invite sent! 🎉", "Thanks for sharing the good energy!");
         }
-      } catch (shareError: any) {
+      } catch (shareError) {
         // If sharing fails, try opening the store directly
         const canOpen = await Linking.canOpenURL(storeUrl);
         if (canOpen) {
           await Linking.openURL(storeUrl);
         } else {
-          Toast.show({
-            type: "error",
-            text1: "Couldn't share invite",
-            text2: "Please try again in a moment.",
-          });
+          showToast.error("Couldn't share invite", "Please try again in a moment.");
         }
       }
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to generate invite",
-        text2: "Please try again",
-      });
+    } catch (error) {
+      showToast.error("Failed to generate invite", "Please try again");
     }
-  };
+  }, [shareMessage]);
 
   const handleNotificationTimeUpdate = useCallback(
     async (date: Date) => {
@@ -433,20 +355,12 @@ function Settings() {
 
       try {
         await scheduleDailyNotification(newTime);
-        Toast.show({
-          type: "success",
-          text1: "Reminder refreshed",
-          text2: `We'll nudge you at ${newTime}.`,
-        });
+        showToast.success("Reminder refreshed", `We'll nudge you at ${newTime}.`);
       } catch (error) {
         setNotificationTime(previousTime);
         setIosTimePickerValue(createDateFromTimeString(previousTime));
         await Storage.setItem(NOTIFICATION_TIME_KEY, previousTime);
-        Toast.show({
-          type: "error",
-          text1: "Couldn't update reminder",
-          text2: "Please try again in a moment.",
-        });
+        showToast.error("Couldn't update reminder", "Please try again in a moment.");
       }
     },
     [notificationTime, notificationsEnabled, scheduleDailyNotification]
@@ -492,50 +406,92 @@ function Settings() {
     setShowReferralModal(true);
   }, []);
 
-  const handleNotificationToggle = async (value: boolean) => {
-    if (value) {
-      // Request permissions first
-      const hasPermission = await requestPermissions();
-      if (!hasPermission) {
-        setNotificationsEnabled(false);
+  const handleCloseReferralModal = useCallback(() => {
+    setShowReferralModal(false);
+    setReferralCodeInput("");
+  }, []);
+
+  const handleSubmitReferralCode = useCallback(async () => {
+    if (!referralCodeInput || referralCodeInput.trim().length === 0) {
+      showToast.error("That code doesn't look right", "Double-check it and try again.");
+      return;
+    }
+
+    setIsSubmittingCode(true);
+    try {
+      const result = await ReferralService.enterReferralCode(referralCodeInput);
+      if (result.success) {
+        showToast.success("Code applied! 🎉", result.message);
+        setShowReferralModal(false);
+        setReferralCodeInput("");
+        await loadPremiumStatus();
+      } else {
+        showToast.error("Couldn't apply the code", result.message);
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Please try again in a moment.";
+      showToast.error("Something went wrong", errorMessage);
+    } finally {
+      setIsSubmittingCode(false);
+    }
+  }, [referralCodeInput, loadPremiumStatus]);
+
+  const handleSendEmail = useCallback(async () => {
+    try {
+      const isAvailable = await MailComposer.isAvailableAsync();
+      if (!isAvailable) {
+        showToast.info("No email app found", `Please email us at ${CONTACT_EMAIL}`);
         return;
       }
-    }
 
-    setNotificationsEnabled(value);
-    await Storage.setItem(NOTIFICATION_ENABLED_KEY, value);
+      const result = await MailComposer.composeAsync({
+        recipients: [CONTACT_EMAIL],
+        subject: "My Aura Log Feedback",
+        body: "Hi My Aura Log team,\n\nI wanted to reach out about...\n\n",
+      });
 
-    if (value) {
-      try {
-        await scheduleDailyNotification(notificationTime);
-
-        Toast.show({
-          type: "success",
-          text1: "Reminders on",
-          text2: `We'll check in at ${notificationTime}.`,
-        });
-      } catch (error) {
-        setNotificationsEnabled(false);
-        await Storage.setItem(NOTIFICATION_ENABLED_KEY, false);
-        Toast.show({
-          type: "error",
-          text1: "Couldn't schedule reminder",
-          text2: "Please try again in a moment.",
-        });
+      if (result.status === MailComposer.MailComposerStatus.SENT) {
+        console.log("Email sent successfully");
       }
-    } else {
-      try {
-        await Notifications.cancelAllScheduledNotificationsAsync();
-        Toast.show({
-          type: "info",
-          text1: "Reminders off",
-          text2: "Jump back in whenever you like.",
-        });
-      } catch (error) {
-        // Silently fail
-      }
+    } catch (error) {
+      showToast.error("Couldn't open email", `Please email us at ${CONTACT_EMAIL}`);
     }
-  };
+  }, []);
+
+  const handleNotificationToggle = useCallback(
+    async (value: boolean) => {
+      if (value) {
+        // Request permissions first
+        const hasPermission = await requestPermissions();
+        if (!hasPermission) {
+          setNotificationsEnabled(false);
+          return;
+        }
+      }
+
+      setNotificationsEnabled(value);
+      await Storage.setItem(NOTIFICATION_ENABLED_KEY, value);
+
+      if (value) {
+        try {
+          await scheduleDailyNotification(notificationTime);
+          showToast.success("Reminders on", `We'll check in at ${notificationTime}.`);
+        } catch (error) {
+          setNotificationsEnabled(false);
+          await Storage.setItem(NOTIFICATION_ENABLED_KEY, false);
+          showToast.error("Couldn't schedule reminder", "Please try again in a moment.");
+        }
+      } else {
+        try {
+          await Notifications.cancelAllScheduledNotificationsAsync();
+          showToast.info("Reminders off", "Jump back in whenever you like.");
+        } catch (error) {
+          // Silently fail
+        }
+      }
+    },
+    [notificationTime, requestPermissions, scheduleDailyNotification]
+  );
 
   const handleClearData = () => {
     Alert.alert(
@@ -598,18 +554,10 @@ function Settings() {
               // Reset Redux state
               resetState(store.dispatch);
 
-              Toast.show({
-                type: "success",
-                text1: "All data cleared",
-                text2: "The app has been reset to a fresh state.",
-              });
+              showToast.success("All data cleared", "The app has been reset to a fresh state.");
             } catch (error) {
               console.error("Error clearing data:", error);
-              Toast.show({
-                type: "error",
-                text1: "Failed to clear all data",
-                text2: "Some data may not have been cleared. Please try again.",
-              });
+              showToast.error("Failed to clear all data", "Some data may not have been cleared. Please try again.");
             }
           },
         },
@@ -757,31 +705,7 @@ function Settings() {
             Questions, ideas, or just want to share your thoughts? We&apos;re all ears.
           </Text>
           <TouchableOpacity
-            onPress={async () => {
-              const email = "myauralog@gmail.com";
-              const subject = encodeURIComponent("My Aura Log Feedback");
-              const body = encodeURIComponent("Hi My Aura Log team,\n\nI wanted to reach out about...\n\n");
-              const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
-
-              try {
-                const canOpen = await Linking.canOpenURL(mailtoUrl);
-                if (canOpen) {
-                  await Linking.openURL(mailtoUrl);
-                } else {
-                  Toast.show({
-                    type: "info",
-                    text1: "No email app found",
-                    text2: "Please email us at myauralog@gmail.com",
-                  });
-                }
-              } catch (error) {
-                Toast.show({
-                  type: "error",
-                  text1: "Couldn't open email",
-                  text2: "Please email us at myauralog@gmail.com",
-                });
-              }
-            }}
+            onPress={handleSendEmail}
             style={{
               backgroundColor: "#9B87F5",
               paddingVertical: 14,
@@ -797,7 +721,7 @@ function Settings() {
         </Box>
       </Box>
 
-      {Platform.OS === "ios" && (
+      {Platform.OS === "ios" && showTimePicker && (
         <Modal visible={showTimePicker} transparent animationType="slide" onRequestClose={handleTimePickerCancel}>
           <Box flex={1} justifyContent="center" alignItems="center" style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}>
             <Box
@@ -882,10 +806,7 @@ function Settings() {
 
             <Box flexDirection="row" marginTop="m" gap="s">
               <TouchableOpacity
-                onPress={() => {
-                  setShowReferralModal(false);
-                  setReferralCodeInput("");
-                }}
+                onPress={handleCloseReferralModal}
                 style={[styles.modalButton, styles.cancelButton]}
                 disabled={isSubmittingCode}>
                 <Text variant="button" color="textDefault">
@@ -894,45 +815,7 @@ function Settings() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={async () => {
-                  if (!referralCodeInput || referralCodeInput.trim().length === 0) {
-                    Toast.show({
-                      type: "error",
-                      text1: "That code doesn&apos;t look right",
-                      text2: "Double-check it and try again.",
-                    });
-                    return;
-                  }
-
-                  setIsSubmittingCode(true);
-                  try {
-                    const result = await ReferralService.enterReferralCode(referralCodeInput);
-                    if (result.success) {
-                      Toast.show({
-                        type: "success",
-                        text1: "Code applied! 🎉",
-                        text2: result.message,
-                      });
-                      setShowReferralModal(false);
-                      setReferralCodeInput("");
-                      await loadPremiumStatus();
-                    } else {
-                      Toast.show({
-                        type: "error",
-                        text1: "Couldn't apply the code",
-                        text2: result.message,
-                      });
-                    }
-                  } catch (error: any) {
-                    Toast.show({
-                      type: "error",
-                      text1: "Something went wrong",
-                      text2: error.message || "Please try again in a moment.",
-                    });
-                  } finally {
-                    setIsSubmittingCode(false);
-                  }
-                }}
+                onPress={handleSubmitReferralCode}
                 style={[styles.modalButton, styles.applyButton]}
                 disabled={isSubmittingCode || !referralCodeInput.trim()}>
                 {isSubmittingCode ? (

@@ -4,11 +4,11 @@ require("dotenv").config({
   path: path.resolve(__dirname, process.env.NODE_ENV ? `.env.${process.env.NODE_ENV}` : ".env"),
 });
 
-export function isObject(item) {
+function isObject(item) {
   return item && typeof item === "object" && !Array.isArray(item);
 }
 
-export function mergeDeep(target, ...sources) {
+function mergeDeep(target, ...sources) {
   if (!sources.length) return target;
   const source = sources.shift();
 
@@ -59,8 +59,6 @@ const prepareConfigFromEnv = () => {
 };
 
 const envConfig = prepareConfigFromEnv();
-
-// Enable http support
 const usesCleartextTraffic = process.env.EXPO_PUBLIC_apiEndpoint?.startsWith("http://");
 
 module.exports = ({ config }) => {
@@ -79,7 +77,10 @@ module.exports = ({ config }) => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
-      buildNumber: "3",
+      buildNumber: "2",
+      infoPlist: {
+        ITSAppUsesNonExemptEncryption: false
+      }
     },
     android: {
       adaptiveIcon: {
@@ -87,14 +88,34 @@ module.exports = ({ config }) => {
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
-      versionCode: 3,
+      versionCode: 4,
       permissions: ["android.permission.CAMERA"],
       privacy: {
         privacyPolicy: "https://rohanbasukala15.github.io/My-Aura-Log/privacy-policy.html",
       },
     },
     plugins: [
-      ["expo-build-properties", { android: { usesCleartextTraffic } }],
+      "expo-mail-composer",
+      "expo-asset",
+      "expo-font",
+      "expo-localization",
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          android: {
+            usesCleartextTraffic
+          },
+          ios: {
+            useFrameworks: "static",
+            allowNonModularIncludesInFrameworkModules: true,
+            buildReactNativeFromSource: true,
+            deploymentTarget: "15.1"
+          }
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -119,17 +140,9 @@ module.exports = ({ config }) => {
       policy: "appVersion"
     }
   };
+
   const finalConfig = mergeDeep({}, config, envConfig, overridesConfig);
-  finalConfig.plugins.push(
-    [
-      "expo-build-properties",
-      {
-        ios: {
-          useFrameworks: "static"
-        }
-      }
-    ]
-  );
+
   if (finalConfig?.android?.versionCode) {
     finalConfig.android.versionCode = parseInt(finalConfig.android.versionCode, 10) || 1;
   }

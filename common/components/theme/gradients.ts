@@ -63,7 +63,7 @@ export const GRADIENTS = {
    * Used for breathing screen and other full-screen backgrounds
    */
   backgroundSolid: {
-    colors: ["rgba(248, 246, 255, 1)", "rgba(248, 246, 255, 0.95)", "rgba(248, 246, 255, 1)"] as const,
+    colors: ["rgba(248, 246, 255, 1)", "rgba(242, 239, 254, 0.95)", "rgba(248, 246, 255, 1)"] as const,
     start: { x: 0, y: 0 } as const,
     end: { x: 1, y: 1 } as const,
   },

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
-import { StyleSheet, KeyboardAvoidingView, Platform, View, TouchableOpacity, Modal } from "react-native";
+import { StyleSheet, Platform, View, TouchableOpacity, Modal } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import PagerView from "react-native-pager-view";
 import { useRouter } from "expo-router";
@@ -11,14 +11,14 @@ import { Button, TextInput } from "@common/components/ui";
 import { Switch } from "@common/components/ui/Switch";
 import { ONBOARDING_STEPS, OnboardingStep } from "@common/models/Onboarding";
 import { useAppDispatch } from "@common/redux";
-import { setOnboardingComplete } from "@common/redux/slices/appConfiguration/app-configuration.slice";
+import { setOnboardingComplete, setBiometricEnabled } from "@common/redux/slices/appConfiguration/app-configuration.slice";
 import { Storage } from "@common/services/Storage";
 import { NotificationService } from "@common/services/notificationService";
 import { GRADIENTS } from "@common/components/theme/gradients";
 import { Image } from "expo-image";
 import { useBiometricAvailability } from "@common/hooks/useBiometricAvailability";
 import { authenticateWithBiometrics, formatBiometricType } from "@common/utils/biometric-utils";
-import { ScrollView } from "react-native-gesture-handler";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 // Image mapping for onboarding steps
 const ONBOARDING_IMAGES = {
@@ -53,7 +53,7 @@ export default function OnboardingScreen() {
     if (onboardingData.user_name) {
       await Storage.setItem("user_name", onboardingData.user_name);
     }
-    
+
     // Save notification settings using the same keys as settings screen
     if (onboardingData.daily_notifications !== undefined) {
       await Storage.setItem(NotificationService.NOTIFICATION_ENABLED_KEY, onboardingData.daily_notifications);
@@ -61,7 +61,7 @@ export default function OnboardingScreen() {
     if (onboardingData.notification_time) {
       await Storage.setItem(NotificationService.NOTIFICATION_TIME_KEY, onboardingData.notification_time);
     }
-    
+
     // Schedule notification if enabled
     if (onboardingData.daily_notifications && onboardingData.notification_time) {
       try {
@@ -73,12 +73,19 @@ export default function OnboardingScreen() {
         // Silently fail - user can enable in settings later
       }
     }
-    
+
+    // Save biometric enabled state to Redux
     if (onboardingData.biometric_enabled !== undefined) {
-      await Storage.setItem("biometric_enabled", onboardingData.biometric_enabled);
+      dispatch(setBiometricEnabled(onboardingData.biometric_enabled));
     }
     dispatch(setOnboardingComplete());
-    router.replace("/(home)/(tabs)/dashboard");
+    
+    // If biometric is enabled, redirect to biometric login screen
+    if (onboardingData.biometric_enabled) {
+      router.replace("/(login-with-biometric)");
+    } else {
+      router.replace("/(home)/(tabs)/dashboard");
+    }
   }, [onboardingData, dispatch, router]);
 
   const handleNext = useCallback(() => {
@@ -143,10 +150,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
+    <Box flex={1}>
       <StatusBar style="dark" />
       <LinearGradient
         colors={GRADIENTS.backgroundSolid.colors}
@@ -182,7 +186,7 @@ export default function OnboardingScreen() {
           </Box>
         </Box>
       </LinearGradient>
-    </KeyboardAvoidingView>
+    </Box>
   );
 }
 
@@ -195,24 +199,35 @@ interface OnboardingStepLayoutProps {
 
 function OnboardingStepLayout({ step, content, buttons }: OnboardingStepLayoutProps) {
   return (
-    <Box flex={1} paddingTop="xl" paddingHorizontal="m" paddingBottom="xl">
-      {/* Decorative gradient circles */}
-      <View style={step.step === 1 ? styles.decorativeCircle3 : styles.decorativeCircle1} />
-      <View style={styles.decorativeCircle2} />
-      {/* Scrollable content section */}
-      <ScrollView
-        style={{ flex: 1 }}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1 }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive">
-        <Box alignItems="center" zIndex={1} marginVertical={"xl"} style={styles.headerSection}>
+    <KeyboardAwareScrollView
+      style={{ flex: 1 }}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between" }}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      enableOnAndroid={true}
+      enableAutomaticScroll={true}
+      onKeyboardWillShow={() => {
+        console.log("keyboard will show");
+      }}>
+      <Box flex={1} paddingTop="xl" paddingHorizontal="m" paddingBottom="xl">
+        {/* Decorative gradient circles */}
+        <View style={step.step === 1 ? styles.decorativeCircle3 : styles.decorativeCircle1} />
+        <View style={styles.decorativeCircle2} />
+        {/* Scrollable content section */}
+        <Box alignItems="center" zIndex={1} marginTop={"l"} marginBottom={"m"} style={styles.headerSection}>
           <Image
             source={ONBOARDING_IMAGES[step.step as keyof typeof ONBOARDING_IMAGES]}
             contentFit="contain"
             style={styles.logoImage}
           />
-          <Text variant="h1-pacifico" color="textDefault" textAlign="center" marginTop="l" style={styles.title}>
+          <Text
+            variant="h1-pacifico"
+            color="textDefault"
+            textAlign="center"
+            marginTop="l"
+            paddingHorizontal={"l"}
+            style={styles.title}>
             {step.title}
           </Text>
           <>
@@ -232,16 +247,13 @@ function OnboardingStepLayout({ step, content, buttons }: OnboardingStepLayoutPr
             <Box marginBottom="xl" zIndex={1} style={styles.contentSection}>
               {content}
             </Box>
-            <Box height={100} />
           </>
         )}
-      </ScrollView>
-
-      {/* Fixed button section - Always at bottom, outside ScrollView */}
-      <Box width="100%" zIndex={1}>
+      </Box>
+      <Box paddingBottom="l" paddingHorizontal="m" width="100%" zIndex={1}>
         {buttons}
       </Box>
-    </Box>
+    </KeyboardAwareScrollView>
   );
 }
 
@@ -514,9 +526,10 @@ interface SecurityStepProps {
   onSkip: () => void;
 }
 
-function SecurityStep({ step, biometricEnabled, onBiometricChange, onNext, onSkip }: SecurityStepProps) {
+function SecurityStep({ step, biometricEnabled, onBiometricChange, onNext }: SecurityStepProps) {
   const { isAvailable, type } = useBiometricAvailability();
   const biometricTypeName = formatBiometricType(type);
+  const dispatch = useAppDispatch();
 
   const handleContinueJourney = useCallback(async () => {
     onNext();
@@ -531,23 +544,23 @@ function SecurityStep({ step, biometricEnabled, onBiometricChange, onNext, onSki
           errorMessage: `Failed to enable ${biometricTypeName}. Please try again.`,
           onSuccess: () => {
             onBiometricChange(true);
+            // Save to Redux immediately when enabled
+            dispatch(setBiometricEnabled(true));
           },
           onFailure: () => {
             onBiometricChange(false);
+            dispatch(setBiometricEnabled(false));
           },
           disableDeviceFallback: false,
         });
       } else {
         onBiometricChange(false);
+        // Save to Redux when disabled
+        dispatch(setBiometricEnabled(false));
       }
     },
-    [biometricTypeName, onBiometricChange]
+    [biometricTypeName, onBiometricChange, dispatch]
   );
-
-  const handleSkip = useCallback(() => {
-    onBiometricChange(false);
-    onSkip();
-  }, [onBiometricChange, onSkip]);
 
   return (
     <OnboardingStepLayout
