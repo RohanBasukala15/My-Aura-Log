@@ -11,11 +11,13 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Switch,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as MailComposer from "expo-mail-composer";
+import * as Application from "expo-application";
 import Toast from "react-native-toast-message";
 import DateTimePicker, { DateTimePickerAndroid, DateTimePickerEvent } from "@react-native-community/datetimepicker";
 
@@ -31,6 +33,10 @@ import { NotificationService } from "@common/services/notificationService";
 import AppConstants from "@common/assets/AppConstants";
 import { resetState } from "@common/redux/actions";
 import { store } from "@common/redux/store";
+import { useAppDispatch, useAppSelector } from "@common/redux/hooks";
+import { setBiometricEnabled } from "@common/redux/slices/appConfiguration/app-configuration.slice";
+import { useBiometricAvailability } from "@common/hooks/useBiometricAvailability";
+import { authenticateWithBiometrics, formatBiometricType } from "@common/utils/biometric-utils";
 
 import { PremiumSection } from "@common/screens/settings/PremiumSection";
 import { NotificationsSection } from "@common/screens/settings/NotificationsSection";
@@ -47,7 +53,7 @@ const {
 
 // Constants
 const CONTACT_EMAIL = "myauralog@gmail.com";
-const PAYMENT_UNAVAILABLE_MESSAGE = "Payment service is not configured. Please add your RevenueCat API key to the .env file.";
+const PAYMENT_UNAVAILABLE_MESSAGE = "Payment service is not configured. Please contact support.";
 
 // Toast helper functions
 const showToast = {
@@ -58,6 +64,10 @@ const showToast = {
 
 function Settings() {
   const theme = useTheme();
+  const dispatch = useAppDispatch();
+  const { isAvailable: isBiometricAvailable, type: biometricType } = useBiometricAvailability();
+  const biometricEnabled = useAppSelector(state => state.appConfiguration.biometricEnabled ?? false);
+  const biometricTypeName = formatBiometricType(biometricType);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState(DEFAULT_NOTIFICATION_TIME);
   const [isPremium, setIsPremium] = useState(false);
@@ -79,6 +89,7 @@ function Settings() {
   const [nameInput, setNameInput] = useState("");
   const [lifetimePrice, setLifetimePrice] = useState<string>();
   const [monthlyPrice, setMonthlyPrice] = useState<string>();
+  const [appVersion, setAppVersion] = useState<string>("1.0.0");
   const isInitialLoad = useRef(true);
 
   // Define scheduleDailyNotification first so it can be used in loadSettings
@@ -105,7 +116,6 @@ function Settings() {
 
       const lifetimePkg = await PaymentService.getLifetimePackage();
       const monthlyPkg = await PaymentService.getMonthlyPackage();
-
       if (lifetimePkg) {
         setLifetimePrice(lifetimePkg.product.priceString);
       }
@@ -115,7 +125,6 @@ function Settings() {
       }
     } catch (error) {
       // Silently fail - will use default prices
-      console.log("Could not load package prices:", error);
     }
   }, []);
 
@@ -189,6 +198,17 @@ function Settings() {
     }
   }, [scheduleDailyNotification]);
 
+  const loadAppVersion = useCallback(async () => {
+    try {
+      const version = Application.nativeApplicationVersion || "1.0.0";
+      const buildNumber = Application.nativeBuildVersion || "1";
+      setAppVersion(`${version} (${buildNumber})`);
+    } catch (error) {
+      // Fallback to default version if there's an error
+      setAppVersion("1.0.0");
+    }
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       await loadSettings();
@@ -196,10 +216,11 @@ function Settings() {
       await requestPermissions();
       await loadPremiumStatus();
       await loadPackagePrices();
+      await loadAppVersion();
       isInitialLoad.current = false;
     };
     init();
-  }, [loadSettings, loadUserName, loadPremiumStatus, loadPackagePrices, requestPermissions]);
+  }, [loadSettings, loadUserName, loadPremiumStatus, loadPackagePrices, requestPermissions, loadAppVersion]);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -298,11 +319,11 @@ function Settings() {
   );
 
   const handleBuyLifetime = useCallback(() => {
-    handlePurchase(PaymentService.purchaseLifetime, "Thanks for fueling the journey!", "lifetime");
+    handlePurchase(() => PaymentService.purchaseLifetime(), "Thanks for fueling the journey!", "lifetime");
   }, [handlePurchase]);
 
   const handleBuyMonthly = useCallback(() => {
-    handlePurchase(PaymentService.purchaseMonthly, "Welcome to premium!", "monthly");
+    handlePurchase(() => PaymentService.purchaseMonthly(), "Welcome to premium!", "monthly");
   }, [handlePurchase]);
 
   // Memoize share message to avoid recreating on every render
@@ -451,7 +472,7 @@ function Settings() {
       });
 
       if (result.status === MailComposer.MailComposerStatus.SENT) {
-        console.log("Email sent successfully");
+        showToast.success("Email sent successfully", "Thank you for your feedback!");
       }
     } catch (error) {
       showToast.error("Couldn't open email", `Please email us at ${CONTACT_EMAIL}`);
@@ -491,6 +512,30 @@ function Settings() {
       }
     },
     [notificationTime, requestPermissions, scheduleDailyNotification]
+  );
+
+  const handleBiometricToggle = useCallback(
+    async (value: boolean) => {
+      if (value) {
+        await authenticateWithBiometrics({
+          promptMessage: `Enable ${biometricTypeName} to secure your Aura Log`,
+          fallbackLabel: "Use passcode",
+          errorMessage: `Failed to enable ${biometricTypeName}. Please try again.`,
+          onSuccess: () => {
+            dispatch(setBiometricEnabled(true));
+            showToast.success(`${biometricTypeName} enabled`, "Your Aura Log is now secured.");
+          },
+          onFailure: () => {
+            dispatch(setBiometricEnabled(false));
+          },
+          disableDeviceFallback: false,
+        });
+      } else {
+        dispatch(setBiometricEnabled(false));
+        showToast.info(`${biometricTypeName} disabled`, "You can re-enable it anytime.");
+      }
+    },
+    [biometricTypeName, dispatch]
   );
 
   const handleClearData = () => {
@@ -556,7 +601,6 @@ function Settings() {
 
               showToast.success("All data cleared", "The app has been reset to a fresh state.");
             } catch (error) {
-              console.error("Error clearing data:", error);
               showToast.error("Failed to clear all data", "Some data may not have been cleared. Please try again.");
             }
           },
@@ -659,6 +703,50 @@ function Settings() {
           )}
         </Box>
 
+        {/* Security Section - Biometric Authentication */}
+        {isBiometricAvailable && (
+          <Box
+            marginBottom="l"
+            padding="m"
+            borderRadius="m"
+            style={{
+              backgroundColor: theme.colors.white,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 2,
+            }}>
+            <Text variant="h4" marginBottom="m" color="textDefault">
+              Security
+            </Text>
+            <Box>
+              <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+                <Box flex={1}>
+                  <Text variant="default" color="textDefault" style={{ marginBottom: 4 }}>
+                    Enable {biometricTypeName}
+                  </Text>
+                  <Text variant="caption" color="textSubdued">
+                    Use {biometricTypeName} to quickly and securely access your Aura Log
+                  </Text>
+                </Box>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={handleBiometricToggle}
+                  trackColor={{ false: theme.colors.borderSubdued, true: theme.colors.primary }}
+                  thumbColor={theme.colors.white}
+                />
+              </Box>
+            </Box>
+          </Box>
+        )}
+
+        <NotificationsSection
+          notificationsEnabled={notificationsEnabled}
+          notificationTime={notificationTime}
+          onToggleNotifications={handleNotificationToggle}
+          onSelectTime={handleSelectNotificationTime}
+        />
         <PremiumSection
           isPremium={isPremium}
           remainingAI={remainingAI}
@@ -675,17 +763,8 @@ function Settings() {
           onOpenReferralModal={openReferralModal}
         />
 
-        <NotificationsSection
-          notificationsEnabled={notificationsEnabled}
-          notificationTime={notificationTime}
-          onToggleNotifications={handleNotificationToggle}
-          onSelectTime={handleSelectNotificationTime}
-        />
 
-        <DangerZoneSection onClearData={handleClearData} />
-
-
-        <LegalSection appVersion="1.0.0" />
+        <LegalSection appVersion={appVersion} />
         {/* Contact Section */}
         <Box
           backgroundColor="white"
@@ -718,6 +797,9 @@ function Settings() {
               Send Us a Message
             </Text>
           </TouchableOpacity>
+        </Box>
+        <Box marginVertical="l">
+          <DangerZoneSection onClearData={handleClearData} />
         </Box>
       </Box>
 

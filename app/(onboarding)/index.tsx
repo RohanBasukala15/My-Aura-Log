@@ -79,13 +79,8 @@ export default function OnboardingScreen() {
       dispatch(setBiometricEnabled(onboardingData.biometric_enabled));
     }
     dispatch(setOnboardingComplete());
-    
-    // If biometric is enabled, redirect to biometric login screen
-    if (onboardingData.biometric_enabled) {
-      router.replace("/(login-with-biometric)");
-    } else {
-      router.replace("/(home)/(tabs)/dashboard");
-    }
+
+    router.replace("/(home)/(tabs)/dashboard");
   }, [onboardingData, dispatch, router]);
 
   const handleNext = useCallback(() => {
@@ -131,7 +126,7 @@ export default function OnboardingScreen() {
             onChange={value => updateOnboardingData(step.toggle?.key || "", value)}
             onTimeChange={time => updateOnboardingData("notification_time", time)}
             onNext={handleNext}
-            onSkip={handleSkip}
+            onSkip={handleNext}
           />
         );
       case "security":
@@ -163,7 +158,9 @@ export default function OnboardingScreen() {
             style={styles.pagerView}
             initialPage={0}
             onPageSelected={handlePageSelected}
-            scrollEnabled={true}>
+            scrollEnabled={
+              currentPage !== 1 || (currentPage === 1 && !!onboardingData.user_name?.trim())
+            }>
             {ONBOARDING_STEPS.map(step => (
               <Box key={step.step} flex={1}>
                 {renderStep(step)}
@@ -195,9 +192,10 @@ interface OnboardingStepLayoutProps {
   step: OnboardingStep;
   content?: React.ReactNode;
   buttons: React.ReactNode;
+  scrollEnabled?: boolean;
 }
 
-function OnboardingStepLayout({ step, content, buttons }: OnboardingStepLayoutProps) {
+function OnboardingStepLayout({ step, content, buttons, scrollEnabled = true }: OnboardingStepLayoutProps) {
   return (
     <KeyboardAwareScrollView
       style={{ flex: 1 }}
@@ -207,9 +205,8 @@ function OnboardingStepLayout({ step, content, buttons }: OnboardingStepLayoutPr
       keyboardDismissMode="interactive"
       enableOnAndroid={true}
       enableAutomaticScroll={true}
-      onKeyboardWillShow={() => {
-        console.log("keyboard will show");
-      }}>
+      scrollEnabled={scrollEnabled}
+      >
       <Box flex={1} paddingTop="xl" paddingHorizontal="m" paddingBottom="xl">
         {/* Decorative gradient circles */}
         <View style={step.step === 1 ? styles.decorativeCircle3 : styles.decorativeCircle1} />
@@ -285,6 +282,12 @@ interface InputStepProps {
 function InputStep({ step, value = "", onChange, onNext }: InputStepProps) {
   const [inputValue, setInputValue] = useState(value);
 
+  const handleInputChange = (text: string) => {
+    setInputValue(text);
+    // Update parent state immediately so PagerView can control scrolling
+    onChange(text);
+  };
+
   const handleNext = () => {
     if (inputValue.trim()) {
       onChange(inputValue.trim());
@@ -292,14 +295,17 @@ function InputStep({ step, value = "", onChange, onNext }: InputStepProps) {
     }
   };
 
+  const hasValue = !!inputValue.trim();
+
   return (
     <OnboardingStepLayout
       step={step}
+      scrollEnabled={hasValue}
       content={
         <TextInput
           placeholder={step.input?.placeholder || ""}
           value={inputValue}
-          onChangeText={setInputValue}
+          onChangeText={handleInputChange}
           autoFocus
           returnKeyType="done"
           onSubmitEditing={handleNext}
@@ -311,7 +317,7 @@ function InputStep({ step, value = "", onChange, onNext }: InputStepProps) {
           variant="primary"
           size="large"
           onPress={handleNext}
-          disabled={!inputValue.trim()}
+          disabled={!hasValue}
           style={styles.button}
         />
       }

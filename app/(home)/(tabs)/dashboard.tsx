@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   TextInput as RNTextInput,
   Alert,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { StatusBar } from "expo-status-bar";
 import Toast from "react-native-toast-message";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,6 +19,7 @@ import { JournalStorage } from "@common/services/journalStorage";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { OpenAIService } from "@common/services/openaiService";
 import { PremiumService } from "@common/services/premiumService";
+import { PaymentService } from "@common/services/paymentService";
 import { Storage } from "@common/services/Storage";
 import { useAppDispatch, useAppSelector } from "@common/redux";
 import type { RootState } from "@common/redux/store";
@@ -313,6 +314,8 @@ function Dashboard() {
   const [isPremium, setIsPremium] = useState(false);
   const [breathingRecommendation, setBreathingRecommendation] = useState<BreathingRecommendation | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [lifetimePrice, setLifetimePrice] = useState<string>();
+  const [monthlyPrice, setMonthlyPrice] = useState<string>();
 
   // Load user name
   const loadUserName = useCallback(async () => {
@@ -352,17 +355,40 @@ function Dashboard() {
     setRemainingAI(remaining);
   }, []);
 
+  const loadPackagePrices = useCallback(async () => {
+    try {
+      if (!PaymentService.isAvailable()) {
+        return;
+      }
+
+      const lifetimePkg = await PaymentService.getLifetimePackage();
+      const monthlyPkg = await PaymentService.getMonthlyPackage();
+      
+      if (lifetimePkg) {
+        setLifetimePrice(lifetimePkg.product.priceString);
+      }
+
+      if (monthlyPkg) {
+        setMonthlyPrice(monthlyPkg.product.priceString);
+      }
+    } catch (error) {
+      // Silently fail - will use default message without prices
+    }
+  }, []);
+
   useEffect(() => {
     loadPremiumStatus();
+    loadPackagePrices();
     dispatch(checkUpgradeAlertStatus());
-  }, [loadPremiumStatus, dispatch]);
+  }, [loadPremiumStatus, loadPackagePrices, dispatch]);
 
   useFocusEffect(
     useCallback(() => {
       loadPremiumStatus();
+      loadPackagePrices();
       loadUserName();
       dispatch(checkUpgradeAlertStatus());
-    }, [loadPremiumStatus, loadUserName, dispatch])
+    }, [loadPremiumStatus, loadPackagePrices, loadUserName, dispatch])
   );
 
   const updateBreathingRecommendation = useCallback((mood: MoodEmoji | null, text: string) => {
@@ -458,9 +484,19 @@ function Dashboard() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showUpgradeAlert = useCallback((): Promise<boolean> => {
     return new Promise(resolve => {
+      // Build pricing message
+      let pricingInfo = "";
+      if (lifetimePrice && monthlyPrice) {
+        pricingInfo = `\n\n⭐ Monthly: ${monthlyPrice}/month\n☕ Lifetime: ${lifetimePrice} one-time`;
+      } else if (lifetimePrice) {
+        pricingInfo = `\n\n☕ Lifetime: ${lifetimePrice} one-time`;
+      } else if (monthlyPrice) {
+        pricingInfo = `\n\n⭐ Monthly: ${monthlyPrice}/month`;
+      }
+
       Alert.alert(
         "Treat Yourself to Premium ☕",
-        "Unlimited AI reflections stay brewing with a one-time $5 thank-you. Unlock premium to keep the insights flowing all day.",
+        `Unlimited AI reflections stay brewing with a one-time unlock. Unlock premium to keep the insights flowing all day.${pricingInfo}`,
         [
           {
             text: "Maybe later",
@@ -479,7 +515,7 @@ function Dashboard() {
         { cancelable: true }
       );
     });
-  }, [router]);
+  }, [router, lifetimePrice, monthlyPrice]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleAICheck = useCallback(async (): Promise<boolean> => {
@@ -639,10 +675,13 @@ function Dashboard() {
   );
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollView
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}>
+      showsVerticalScrollIndicator={false}
+      enableOnAndroid={true}
+      enableAutomaticScroll={true}
+    >
       <StatusBar style="dark" />
       <LinearGradient
         colors={["#F8F6FF", "#FFFFFF", "#F8F6FF"]}
@@ -834,7 +873,7 @@ function Dashboard() {
           <AIUsageIndicator remainingAI={remainingAI} isPremium={isPremium} />
         </Box>
       </LinearGradient>
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

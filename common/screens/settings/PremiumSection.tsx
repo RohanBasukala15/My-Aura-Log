@@ -11,8 +11,8 @@ type PremiumSectionProps = {
   referralCode: string;
   referralCount: number;
   remainingReferrals: number;
-  lifetimePrice?: string; // e.g., "$4.99" or "$5.00"
-  monthlyPrice?: string; // e.g., "$1.99"
+  lifetimePrice?: string;
+  monthlyPrice?: string;
   onBuyLifetime: () => void;
   onBuyMonthly: () => void;
   onRestorePurchases: () => void;
@@ -74,63 +74,59 @@ export function PremiumSection({
           <Text variant="caption" color="textSubdued" marginBottom="m">
             Get unlimited AI analysis and support future development
           </Text>
-          
+
 
           {/* Monthly Subscription Option */}
-          {monthlyPrice && (
-            <TouchableOpacity
-              onPress={onBuyMonthly}
-              activeOpacity={0.8}
-              style={[styles.premiumButton, styles.monthlyButton]}
-              disabled={isProcessingPayment !== null}>
-              <LinearGradient
-                colors={isProcessingPayment === "monthly" ? ["#D3D3D3", "#B8B8B8"] : ["#9B87F5", "#7DD3C0"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.premiumButtonGradient}>
-                {isProcessingPayment === "monthly" ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Box alignItems="center">
-                    <Text variant="button" style={styles.premiumButtonText}>
-                      ⭐ Monthly Premium
-                    </Text>
-                    <Text variant="caption" style={styles.priceText}>
-                      {monthlyPrice}/months
-                    </Text>
-                  </Box>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={onBuyMonthly}
+            activeOpacity={0.8}
+            style={[styles.premiumButton, styles.monthlyButton]}
+            disabled={isProcessingPayment !== null}>
+            <LinearGradient
+              colors={isProcessingPayment === "monthly" ? ["#D3D3D3", "#B8B8B8"] : ["#9B87F5", "#7DD3C0"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.premiumButtonGradient}>
+              {isProcessingPayment === "monthly" ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Box alignItems="center">
+                  <Text variant="button" style={styles.premiumButtonText}>
+                    ⭐ Monthly Premium
+                  </Text>
+                  {monthlyPrice && <Text variant="caption" style={styles.priceText}>
+                    {monthlyPrice}/months
+                  </Text>}
+                </Box>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
 
           {/* Lifetime Purchase Option */}
-          {lifetimePrice && (
-            <TouchableOpacity
-              onPress={onBuyLifetime}
-              activeOpacity={0.8}
-              style={[styles.premiumButton, styles.lifetimeButton]}
-              disabled={isProcessingPayment !== null}>
-              <LinearGradient
-                colors={isProcessingPayment === "lifetime" ? ["#D3D3D3", "#B8B8B8"] : ["#7DD3C0", "#9B87F5"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.premiumButtonGradient}>
-                {isProcessingPayment === "lifetime" ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Box alignItems="center">
-                    <Text variant="button" style={styles.premiumButtonText}>
-                      ☕ Lifetime Premium
-                    </Text>
-                    <Text variant="caption" style={styles.priceText}>
-                      {lifetimePrice} one-time
-                    </Text>
-                  </Box>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            onPress={onBuyLifetime}
+            activeOpacity={0.8}
+            style={[styles.premiumButton, styles.lifetimeButton]}
+            disabled={isProcessingPayment !== null}>
+            <LinearGradient
+              colors={isProcessingPayment === "lifetime" ? ["#D3D3D3", "#B8B8B8"] : ["#7DD3C0", "#9B87F5"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.premiumButtonGradient}>
+              {isProcessingPayment === "lifetime" ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Box alignItems="center">
+                  <Text variant="button" style={styles.premiumButtonText}>
+                    ☕ Lifetime Premium
+                  </Text>
+                  {lifetimePrice && <Text variant="caption" style={styles.priceText}>
+                    {lifetimePrice} one-time
+                  </Text>}
+                </Box>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
 
           <TouchableOpacity onPress={onRestorePurchases} style={styles.restoreButton} disabled={isProcessingPayment !== null}>
             {isProcessingPayment === "restore" ? (

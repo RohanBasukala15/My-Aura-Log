@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import * as WebBrowser from "expo-web-browser";
 import { LEGAL_DOCS_CONFIG } from "./LegalDocumentConfig";
 
@@ -8,18 +8,10 @@ type LegalDocumentModalProps = {
     documentType: "privacy" | "terms";
 };
 
-/**
- * Opens legal documents in the device's browser
- * 
- * Benefits:
- * - No package installation needed (uses built-in expo-web-browser)
- * - URLs configured once in LegalDocumentConfig.ts
- * - Update documents on GitHub Pages without updating app
- * - Works on iOS and Android
- */
+
 export function LegalDocumentModal({ visible, onClose, documentType }: LegalDocumentModalProps) {
-    
-    const url = documentType === "privacy" 
+
+    const url = documentType === "privacy"
         ? LEGAL_DOCS_CONFIG.privacyPolicyUrl
         : LEGAL_DOCS_CONFIG.termsUrl;
 
@@ -37,7 +29,7 @@ export function LegalDocumentModal({ visible, onClose, documentType }: LegalDocu
                 controlsColor: "#9B87F5",
             });
         } catch (error) {
-            console.error("Error opening document:", error);
+            // Silently fail
         } finally {
             onClose();
         }

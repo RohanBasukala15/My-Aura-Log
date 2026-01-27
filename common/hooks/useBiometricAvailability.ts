@@ -51,7 +51,6 @@ export function useBiometricAvailability(): { isAvailable: boolean; type: Biomet
         const result = { isAvailable: type !== "None", type };
         setResult(result);
       } catch (error) {
-        console.error("Error checking biometric availability:", error);
         setResult({ isAvailable: false, type: "None" });
       }
     }

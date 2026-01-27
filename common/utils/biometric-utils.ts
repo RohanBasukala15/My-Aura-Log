@@ -25,9 +25,11 @@ export const authenticateWithBiometrics = async (options: BiometricAuthOptions):
 
   try {
     // Verify biometric is enrolled before attempting authentication
+    // Note: Caller should handle enrollment checks, but we verify here as a safety check
+    // without showing toast to avoid premature error messages
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
     if (!isEnrolled) {
-      Toast.show("Biometric authentication is not set up on this device", { type: "error" });
+      // Don't show toast here - let the caller handle the enrollment state
       onFailure?.();
       return false;
     }
@@ -44,16 +46,17 @@ export const authenticateWithBiometrics = async (options: BiometricAuthOptions):
       onSuccess();
       return true;
     } else {
-      Toast.show(errorMessage, { type: "warning" });
       // Only show error message for actual authentication failures, not user cancellations
       const errorType = result.error;
       if (errorType !== "user_cancel" && errorType !== "app_cancel" && errorType !== "system_cancel") {
+        // Only show toast for actual failures, not cancellations
         Toast.show(errorMessage, { type: "warning" });
       }
       onFailure?.();
       return false;
     }
   } catch (error) {
+    // Only show toast for unexpected errors during authentication
     Toast.show(errorMessage, { type: "error" });
     onFailure?.();
     return false;

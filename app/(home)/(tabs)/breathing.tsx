@@ -497,6 +497,8 @@ function Breathing() {
     opacity: glowOpacity.value,
   }));
 
+  const showGuidedBanner = contextualMessage && !isActive
+
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -519,9 +521,10 @@ function Breathing() {
                 : "Find your calm"}
             </Text>
           </Box>
+          
 
           {/* Journal Context Banner - Shows connection to journal entry */}
-          {contextualMessage && !isActive && (
+          {showGuidedBanner && (
             <Box position="absolute" top={130} left={0} right={0} paddingHorizontal="m">
               <TouchableOpacity
                 onPress={() => {

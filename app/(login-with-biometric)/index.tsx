@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { Image, StyleSheet, Platform } from "react-native";
-import { Box, PageView, Text } from "@common/components";
+import { Box, PageView, Text, Button } from "@common/components";
 import { useBiometricAvailability } from "@common/hooks/useBiometricAvailability";
 import { authenticateWithBiometrics, formatBiometricType } from "@common/utils/biometric-utils";
 import { useAppDispatch } from "@common/redux/hooks";
@@ -19,7 +19,7 @@ export default function BiometricLoggingInScreen() {
   const styles = useStyles();
   const { type } = useBiometricAvailability();
   const dispatch = useAppDispatch();
-  const [, setIsAuthenticating] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [, setHasFailed] = useState(false);
 
   const handleBiometricAuth = useCallback(async () => {
@@ -88,16 +88,27 @@ export default function BiometricLoggingInScreen() {
   return (
     <PageView type="View">
       <Box flex={1} justifyContent="center" alignItems="center">
-        <Box flex={1} justifyContent="center" alignItems="center" paddingVertical={"xl"}>
+        <Box flex={1} alignItems="center" paddingVertical={"xl"}>
           <Image
             source={require("@common/assets/images/biometric-login.png")}
             style={styles.icon}
             resizeMode="contain"
           />
+          <Text variant="h2-pacifico" color="black" textAlign="center">
+            Unlock Your Aura Log
+          </Text>
+          <Box  marginTop="xl">
+            <Button
+              label="Unlock"
+              variant="primary"
+              onPress={handleBiometricAuth}
+              loading={isAuthenticating}
+              disabled={isAuthenticating}
+              size="large"
+            />
+          </Box>
         </Box>
-        <Text variant="h1-pacifico" color="black" textAlign="center">
-          Log in with Biometric
-        </Text>
+
       </Box>
     </PageView>
   );

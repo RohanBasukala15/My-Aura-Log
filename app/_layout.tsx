@@ -3,7 +3,7 @@ import { SplashScreen, Stack } from "expo-router";
 import { Provider } from "react-redux";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
-import { Alert, BackHandler } from "react-native";
+import { BackHandler } from "react-native";
 import * as Notifications from "expo-notifications";
 import { PaymentService } from "@common/services/paymentService";
 
@@ -17,7 +17,7 @@ import {
 
 import { store } from "@common/redux/store";
 import { toastConfig } from "@common/utils/toast-utils";
-import { useAppDispatch, useAppSelector } from "@common/redux";
+import { useAppDispatch } from "@common/redux";
 import { loadConfiguration } from "@common/redux/slices/appConfiguration/app-configuration.action";
 
 SplashScreen.preventAutoHideAsync();
@@ -60,12 +60,7 @@ function ConfigurationState() {
 export default function Root() {
   // Initialize RevenueCat payment service
   useEffect(() => {
-    PaymentService.initialize().then((success) => {
-      console.log('🔐 RevenueCat initialization result:', success);
-      console.log('💳 Payment service available:', PaymentService.isAvailable());
-    }).catch((error) => {
-      console.error('❌ RevenueCat init error:', error);
-    });
+    PaymentService.initialize()
   }, []);
 
   // disabled android gesture
