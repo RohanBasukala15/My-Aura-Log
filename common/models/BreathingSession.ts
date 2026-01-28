@@ -26,8 +26,8 @@ export const BREATHING_DURATION_LABELS: Record<number, string> = {
 // Default breathing phase timings (seconds)
 export const DEFAULT_PHASE_TIMINGS = {
     inhale: 4,
-    hold: 4,
-    exhale: 6,
+    hold: 3,
+    exhale: 4,
 };
 
 export interface BreathingRecommendation {

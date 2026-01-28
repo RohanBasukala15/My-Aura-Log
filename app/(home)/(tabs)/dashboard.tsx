@@ -350,6 +350,11 @@ function Dashboard() {
   );
 
   const loadPremiumStatus = useCallback(async () => {
+    // First, sync with RevenueCat to get the latest subscription status
+    if (PaymentService.isAvailable()) {
+      await PaymentService.checkPremiumStatus();
+    }
+    
     const [premium, remaining] = await Promise.all([PremiumService.isPremium(), PremiumService.getRemainingAIUsage()]);
     setIsPremium(premium);
     setRemainingAI(remaining);

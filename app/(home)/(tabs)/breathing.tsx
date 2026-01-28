@@ -43,7 +43,7 @@ const getContextualMessage = (mood?: string, emotion?: string): { title: string;
   // If we have an emotion, use emotion-based messages
   if (emotion) {
     const emotionLower = emotion.toLowerCase();
-    
+
     if (emotionLower.includes("anxious") || emotionLower.includes("worried") || emotionLower.includes("stressed")) {
       return {
         title: "🧘 Breathing for calm",
@@ -86,7 +86,7 @@ const getContextualMessage = (mood?: string, emotion?: string): { title: string;
       subtitle: `Honoring your ${emotion} feelings with mindful breath`,
     };
   }
-  
+
   // Fall back to mood-based messages
   if (mood === "😞") {
     return {
@@ -118,7 +118,7 @@ const getContextualMessage = (mood?: string, emotion?: string): { title: string;
       subtitle: "Take this moment to connect with yourself",
     };
   }
-  
+
   // Default message
   return {
     title: "💫 Connected to your journal",
@@ -127,7 +127,6 @@ const getContextualMessage = (mood?: string, emotion?: string): { title: string;
 };
 
 function Breathing() {
-  const theme = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams<{
     journalEntryId?: string;
@@ -141,7 +140,7 @@ function Breathing() {
   const [selectedDuration, setSelectedDuration] = useState<number>(180); // Default 3 min
   const [remainingTime, setRemainingTime] = useState<number>(180);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  
+
   // Journal context from navigation params
   const journalContext = {
     entryId: params.journalEntryId,
@@ -157,6 +156,7 @@ function Breathing() {
   // Timer refs
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hapticIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionStartTimeRef = useRef<number | null>(null);
   const elapsedTimeRef = useRef<number>(0);
 
@@ -241,27 +241,60 @@ function Breathing() {
         });
         break;
       case "exhale":
-        // Scale down during exhale - start from current value
-        scale.value = withTiming(1.5, {
+        // Shrink back to the SAME radius as start of inhale (scale 1)
+        scale.value = withTiming(1, {
           duration: phaseTimings.exhale * 1000,
           easing: Easing.in(Easing.ease),
         });
-        opacity.value = withTiming(0.75, {
+        opacity.value = withTiming(0.7, {
           duration: phaseTimings.exhale * 1000,
         });
         break;
     }
   }, [isActive, currentPhase, phaseTimings]);
 
-  // Haptic feedback on phase change
+  // Inhale: "dot dot dot dot". Hold: none. Hold→exhale: one extra dot. Exhale: none.
   useEffect(() => {
-    if (isActive && currentPhase) {
-      // Light impact for phase transitions
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {
-        // Silently fail if haptics not available
-      });
+    if (!isActive) {
+      if (hapticIntervalRef.current) {
+        clearInterval(hapticIntervalRef.current);
+        hapticIntervalRef.current = null;
+      }
+      return;
     }
-  }, [currentPhase, isActive]);
+
+    const fireDot = () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+    };
+
+    if (currentPhase === "inhale") {
+      fireDot(); // first dot at start of inhale
+      const intervalMs = 600;
+      hapticIntervalRef.current = setInterval(fireDot, intervalMs);
+      return () => {
+        if (hapticIntervalRef.current) {
+          clearInterval(hapticIntervalRef.current);
+          hapticIntervalRef.current = null;
+        }
+      };
+    }
+
+    if (currentPhase === "exhale") {
+      // One extra dot when transitioning from hold to exhale
+      fireDot();
+      if (hapticIntervalRef.current) {
+        clearInterval(hapticIntervalRef.current);
+        hapticIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // hold: clear any leftover and do nothing
+    if (hapticIntervalRef.current) {
+      clearInterval(hapticIntervalRef.current);
+      hapticIntervalRef.current = null;
+    }
+  }, [isActive, currentPhase]);
 
   // Phase cycling logic
   const cyclePhase = useCallback(() => {
@@ -311,6 +344,10 @@ function Breathing() {
       clearTimeout(phaseTimerRef.current);
       phaseTimerRef.current = null;
     }
+    if (hapticIntervalRef.current) {
+      clearInterval(hapticIntervalRef.current);
+      hapticIntervalRef.current = null;
+    }
 
     // Store elapsed time before reset
     const elapsedSeconds = elapsedTimeRef.current;
@@ -330,7 +367,7 @@ function Breathing() {
     elapsedTimeRef.current = 0;
 
     // Reset haptic
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
 
     const completedMinutes = Math.floor(elapsedSeconds / 60);
     const isMeaningfulSession = elapsedSeconds >= 30; // At least 30 seconds to be considered meaningful
@@ -380,7 +417,7 @@ function Breathing() {
     timerRef.current = setInterval(() => {
       setRemainingTime((prev: number) => {
         if (prev <= 1) {
-          handleStop().catch(() => {}); // Handle async without awaiting
+          handleStop().catch(() => { }); // Handle async without awaiting
           return 0;
         }
         elapsedTimeRef.current += 1;
@@ -419,7 +456,7 @@ function Breathing() {
     await BreathingStorage.saveSession(session);
 
     // Start haptic feedback
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
   };
 
   const handlePause = () => {
@@ -428,7 +465,11 @@ function Breathing() {
       clearTimeout(phaseTimerRef.current);
       phaseTimerRef.current = null;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (hapticIntervalRef.current) {
+      clearInterval(hapticIntervalRef.current);
+      hapticIntervalRef.current = null;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
   };
 
   const handleReset = () => {
@@ -454,6 +495,7 @@ function Breathing() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+      if (hapticIntervalRef.current) clearInterval(hapticIntervalRef.current);
       cancelAnimation(scale);
       cancelAnimation(opacity);
       cancelAnimation(progress);
@@ -497,7 +539,16 @@ function Breathing() {
     opacity: glowOpacity.value,
   }));
 
-  const showGuidedBanner = contextualMessage && !isActive
+  const showGuidedBanner = contextualMessage && !isActive;
+
+  const showInfoAlert = () => {
+    Alert.alert(
+      "Inhale–Exhale Breathing Exercise",
+      "4 second inhale, 4 second exhale, and 3 second hold.\n\nPlease listen to your body. If you feel dizzy or anxious, please stop. We love you in this journey.",
+      [{ text: "Got it", style: "default" }],
+      { cancelable: true }
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -509,19 +560,25 @@ function Breathing() {
         style={styles.gradientBackground}>
         <Box flex={1} justifyContent="center" alignItems="center" padding="m" paddingTop="xxxl">
           {/* Header */}
-          <Box position="absolute" top={60} left={0} right={0} alignItems="center">
-            <Text variant="h2-pacifico" textAlign="center" style={styles.title}>
-              Guided Breathing
-            </Text>
-            <Text variant="default" textAlign="center" style={styles.subtitle}>
-              {journalContext.emotion 
-                ? `Finding calm through ${journalContext.emotion}`
-                : journalContext.mood
-                ? `Finding calm for your ${journalContext.mood} moment`
-                : "Find your calm"}
-            </Text>
+          <Box position="absolute" top={60} left={0} right={0} flexDirection="row" alignItems="flex-start" justifyContent="space-between" paddingHorizontal="m">
+            <Box width={40} />
+            <Box flex={1} alignItems="center" justifyContent="center">
+              <Text variant="h2-pacifico" textAlign="center" style={styles.title}>
+                Guided Breathing
+              </Text>
+              <Text variant="default" textAlign="center" style={styles.subtitle}>
+                {journalContext.emotion
+                  ? `Finding calm through ${journalContext.emotion}`
+                  : journalContext.mood
+                    ? `Finding calm for your ${journalContext.mood} moment`
+                    : "Find your calm"}
+              </Text>
+            </Box>
+            <TouchableOpacity onPress={showInfoAlert} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }} activeOpacity={0.7} style={styles.infoIconTouchable}>
+              <MaterialIcons name="info-outline" size={24} color="#7D828A" />
+            </TouchableOpacity>
           </Box>
-          
+
 
           {/* Journal Context Banner - Shows connection to journal entry */}
           {showGuidedBanner && (
@@ -686,6 +743,11 @@ const styles = StyleSheet.create({
     color: "#7D828A",
     fontWeight: "400",
   },
+  infoIconTouchable: {
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sectionTitle: {
     fontWeight: "500",
     fontSize: 15,
@@ -732,9 +794,9 @@ const styles = StyleSheet.create({
     borderRadius: 140,
   },
   circle: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#9BA7F5",

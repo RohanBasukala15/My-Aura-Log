@@ -130,6 +130,11 @@ function Settings() {
 
   const loadPremiumStatus = useCallback(async () => {
     try {
+      // First, sync with RevenueCat to get the latest subscription status
+      if (PaymentService.isAvailable()) {
+        await PaymentService.checkPremiumStatus();
+      }
+
       // Check premium status (this will sync from Firebase if configured)
       const premium = await PremiumService.isPremium();
 

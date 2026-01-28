@@ -69,15 +69,10 @@ module.exports = ({ config }) => {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
-    splash: {
-      image: "./assets/splash.png",
-      resizeMode: "cover",
-      backgroundColor: "#E8D5FF",
-    },
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
-      buildNumber: "3",
+      buildNumber: "4",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
       }
@@ -88,7 +83,7 @@ module.exports = ({ config }) => {
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
-      versionCode: 5,
+      versionCode: 7,
       permissions: ["android.permission.CAMERA"],
       privacy: {
         privacyPolicy: "https://rohanbasukala15.github.io/My-Aura-Log/privacy-policy.html",
@@ -122,6 +117,23 @@ module.exports = ({ config }) => {
           icon: "./assets/icon.png",
           color: "#9B87F5",
           sounds: [],
+        },
+      ],
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/splash.png",
+          backgroundColor: "#E8D5FF",
+          resizeMode: "contain",
+          imageWidth: 220,
+          android: {
+            imageWidth: 280,
+            backgroundColor: "#E8D5FF",
+          },
+          ios: {
+            backgroundColor: "#E8D5FF",
+            resizeMode: "contain",
+          },
         },
       ],
       withNotificationColorOverride,

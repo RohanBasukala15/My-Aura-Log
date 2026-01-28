@@ -17,7 +17,12 @@ const REVENUECAT_API_KEY = Platform.select({
  * CRITICAL: These PRODUCT_IDs must match your App Store/Google Play product IDs exactly
  */
 const PRODUCT_ID_LIFETIME = "premium_lifetime"; // One-time purchase
-const PRODUCT_ID_MONTHLY = "premium_monthly"; // Monthly subscription
+// Android uses "premium_monthly:monthly" while iOS uses "premium_monthly"
+const PRODUCT_ID_MONTHLY = Platform.select({
+  android: "premium_monthly:monthly",
+  ios: "premium_monthly",
+  default: "premium_monthly",
+});
 const ENTITLEMENT_ID = "premium";
 
 export class PaymentService {
@@ -208,9 +213,8 @@ export class PaymentService {
 
       const isPremium = this.hasPremiumAccess(customerInfo);
 
-      if (isPremium) {
-        await PremiumService.setPremiumStatus(true);
-      }
+      // Always update local storage, even if false (to handle cancellations)
+      await PremiumService.setPremiumStatus(isPremium);
 
       return isPremium;
     } catch (error) {

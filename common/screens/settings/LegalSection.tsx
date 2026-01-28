@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React from "react";
 import { StyleSheet, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
 
 import { Box, Text, useTheme } from "@common/components/theme";
-import { LegalDocumentModal } from "./LegalDocumentModal";
 
 type LegalSectionProps = {
     appVersion?: string;
@@ -10,22 +10,10 @@ type LegalSectionProps = {
 
 export function LegalSection({ appVersion = "1.0.0" }: LegalSectionProps) {
     const theme = useTheme();
-    const [modalVisible, setModalVisible] = useState(false);
-    const [documentType, setDocumentType] = useState<"privacy" | "terms">("privacy");
-
-    const handleOpenPrivacyPolicy = async () => {
-        setDocumentType("privacy");
-        setModalVisible(true);
-    };
-
-    const handleOpenTerms = async () => {
-        setDocumentType("terms");
-        setModalVisible(true);
-    };
+    const router = useRouter();
 
     return (
-        <>
-            <Box
+        <Box
                 marginBottom="l"
                 padding="m"
                 borderRadius="m"
@@ -41,13 +29,13 @@ export function LegalSection({ appVersion = "1.0.0" }: LegalSectionProps) {
                     Legal & About
                 </Text>
 
-                <TouchableOpacity onPress={handleOpenPrivacyPolicy} style={styles.linkButton}>
+                <TouchableOpacity onPress={() => router.push("/(home)/privacy-policy")} style={styles.linkButton}>
                     <Text variant="default" color="primary">
                         📄 Privacy Policy
                     </Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={handleOpenTerms} style={styles.linkButton}>
+                <TouchableOpacity onPress={() => router.push("/(home)/terms")} style={styles.linkButton}>
                     <Text variant="default" color="primary">
                         📋 Terms & Conditions
                     </Text>
@@ -62,13 +50,6 @@ export function LegalSection({ appVersion = "1.0.0" }: LegalSectionProps) {
                     </Text>
                 </Box>
             </Box>
-
-            <LegalDocumentModal
-                visible={modalVisible}
-                onClose={() => setModalVisible(false)}
-                documentType={documentType}
-            />
-        </>
     );
 }
 
