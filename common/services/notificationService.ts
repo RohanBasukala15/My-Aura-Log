@@ -1,11 +1,13 @@
 import * as Notifications from "expo-notifications";
 import { Storage } from "./Storage";
+import { PremiumService } from "./premiumService";
+import { OpenAIService } from "./openaiService";
 
 const NOTIFICATION_ENABLED_KEY = "myauralog_notifications_enabled";
 const NOTIFICATION_TIME_KEY = "myauralog_notification_time";
 const DEFAULT_NOTIFICATION_TIME = "09:00";
 
-// Random personalized notification messages
+// Random personalized notification messages (longer + shorter 5–6 word ones)
 const NOTIFICATION_MESSAGES = [
   "Take a mindful pause and capture today's mood in your journal.",
   "Time to check in with yourself and log your aura for today.",
@@ -15,6 +17,16 @@ const NOTIFICATION_MESSAGES = [
   "A quick check-in can shift your whole day—take a moment now.",
   "Your inner weather is worth noting—log your aura today.",
   "Every day is a new chapter. What's yours saying today?",
+  "Log your aura. Feel the shift.",
+  "Your journal is waiting for you.",
+  "One entry. A calmer you.",
+  "Capture today's moment. Just one.",
+  "Check in. Your mind will thank you.",
+  "Today's mood deserves a note.",
+  "A quick pause. A clearer head.",
+  "Your thoughts matter. Write them.",
+  "One minute. One journal entry.",
+  "Breathe. Reflect. Log your day.",
 ];
 
 const pickRandomMessage = (): string => {
@@ -52,11 +64,21 @@ export const scheduleDailyNotification = async (time: string, userName?: string 
     userName = await Storage.getItem<string>("user_name", null);
   }
 
-  // Create personalized body message
+  // Base message (random from list)
   const randomMessage = pickRandomMessage();
-  const body = userName && userName.trim()
-    ? `${userName}, ${randomMessage}`
-    : randomMessage;
+  let body =
+    userName && userName.trim()
+      ? `${userName}, ${randomMessage}`
+      : randomMessage;
+
+  // Premium: append an OpenAI motivational quote (plain text, we add quotes in the notification)
+  const isPremium = await PremiumService.isPremium();
+  if (isPremium) {
+    const quote = await OpenAIService.generateMotivationalQuote();
+    if (quote) {
+      body = `${body}\n\n"${quote}"`;
+    }
+  }
 
   // Schedule daily notification
   const notificationId = await Notifications.scheduleNotificationAsync({
@@ -92,11 +114,40 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
   }
 };
 
+/**
+ * Schedule the "Every Sunday 9 PM" weekly summary notification.
+ * Ideal copy is AI-generated, e.g. "Rohan, you conquered a stressful week! Read how your
+ * 'Family' tag helped you stay grounded." For now we use a fixed body.
+ * Note: scheduleDailyNotification calls cancelAllScheduledNotificationsAsync, which would
+ * clear this. Consider merging both into a single scheduling flow.
+ */
+export const scheduleWeeklySummaryNotification = async (): Promise<string> => {
+  const hasPermission = await requestNotificationPermissions();
+  if (!hasPermission) return "";
+
+  const id = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Your weekly reflection is ready ✨",
+      body: "See how your week unfolded and get a nudge for the next one.",
+      sound: true,
+      data: { type: "weekly_summary" },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: 1, // 1 = Sunday
+      hour: 21,
+      minute: 0,
+    },
+  });
+  return id;
+};
+
 export const NotificationService = {
   NOTIFICATION_ENABLED_KEY,
   NOTIFICATION_TIME_KEY,
   DEFAULT_NOTIFICATION_TIME,
   scheduleDailyNotification,
+  scheduleWeeklySummaryNotification,
   requestNotificationPermissions,
   createDateFromTimeString,
   formatDateToTimeString,

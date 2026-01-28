@@ -117,5 +117,34 @@ Return JSON:
             return generateRandomInsight(mood, context?.tags);
         }
     }
+
+    /**
+     * Generate a short motivational quote for premium daily notifications.
+     * Returns plain text, max ~15 words. Empty string on failure or no API key.
+     */
+    static async generateMotivationalQuote(): Promise<string> {
+        const openai = getOpenAIClient();
+        if (!openai) return "";
+
+        try {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content:
+                            "You respond with a single short motivational or uplifting quote. No preamble, no attribution, no extra punctuation. Plain text only. Maximum 15 words.",
+                    },
+                    { role: "user", content: "Give one short motivational quote." },
+                ],
+                temperature: 0.8,
+                max_tokens: 60,
+            });
+            const text = response.choices[0]?.message?.content?.trim() || "";
+            return text;
+        } catch {
+            return "";
+        }
+    }
 }
 

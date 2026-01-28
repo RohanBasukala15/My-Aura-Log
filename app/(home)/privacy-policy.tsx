@@ -28,7 +28,7 @@ function PrivacyPolicy() {
         </Box>
 
         <Text variant="caption" color="textSubdued" marginBottom="l">
-          Last Updated: January 2025
+          Last Updated: January 2026
         </Text>
 
         <Section title="Introduction">

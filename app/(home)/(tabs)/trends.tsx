@@ -1,257 +1,217 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Dimensions } from "react-native";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  Share,
+  ActivityIndicator,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { LineChart } from "react-native-chart-kit";
+import { LinearGradient } from "expo-linear-gradient";
 import moment from "moment";
 
 import { Box, Text, useTheme } from "@common/components/theme";
 import { JournalEntry, MOOD_LABELS, MOOD_VALUES } from "@common/models/JournalEntry";
 import { JournalStorage } from "@common/services/journalStorage";
+import { PremiumService } from "@common/services/premiumService";
+import {
+  getWeekDays,
+  getWeekMomentForOffset,
+  getWeekRange,
+  formatWeekRange,
+  getWeekId,
+  type WeekDay,
+} from "@common/utils/weekUtils";
+import { generateDailyPulse, type DailyPulse } from "@common/services/dailyPulseService";
+import { ensureWeeklySummary } from "@common/services/weeklySummaryService";
+import type { WeeklySummary } from "@common/services/weeklySummaryStorage";
 
 const screenWidth = Dimensions.get("window").width;
 
+// Y-axis: map numeric value to face (1–5)
+function formatYLabel(value: string): string {
+  const v = Number(value);
+  if (!isFinite(v) || v < 1) return "";
+  if (v <= 1.5) return "😠";
+  if (v <= 2.5) return "😟";
+  if (v <= 3.5) return "😑";
+  if (v <= 4.5) return "😊";
+  return "😊";
+}
+
 function Trends() {
   const theme = useTheme();
+  const router = useRouter();
+  const [weekOffset, setWeekOffset] = useState(0);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
-  const [weeklyData, setWeeklyData] = useState<{ labels: string[]; datasets: any[] } | null>(null);
-  const [averageMood, setAverageMood] = useState<number>(0);
+  const [weekEntries, setWeekEntries] = useState<JournalEntry[]>([]);
+  const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [dailyPulse, setDailyPulse] = useState<DailyPulse | null>(null);
+  const [loadingDailyPulse, setLoadingDailyPulse] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
-  // Ensure averageMood is always a valid number
-  const safeAverageMood = useMemo(() => {
-    const num = Number(averageMood);
-    return isFinite(num) && !isNaN(num) ? num : 0;
-  }, [averageMood]);
+  const today = useMemo(() => moment(), []);
+  const weekMoment = useMemo(() => getWeekMomentForOffset(weekOffset), [weekOffset]);
+  const weekId = useMemo(() => getWeekId(weekMoment), [weekMoment]);
+  const weekDays = useMemo(() => getWeekDays(weekMoment, today), [weekMoment, today]);
+  const { start: weekStart, end: weekEnd } = useMemo(() => getWeekRange(weekMoment), [weekMoment]);
 
-  const loadEntries = async () => {
+  const isCurrentWeek = weekOffset === 0;
+  const isSundayOrPast = !isCurrentWeek || today.isoWeekday() === 7;
+
+  const todayEntries = useMemo(() => {
+    const d = today.format("YYYY-MM-DD");
+    return entries.filter((e) => moment(e.timestamp).format("YYYY-MM-DD") === d);
+  }, [entries, today]);
+
+  const loadEntries = useCallback(async () => {
     try {
-      const allEntries = await JournalStorage.getAllEntries();
-      setEntries(allEntries);
-      processChartData(allEntries);
-    } catch (error) {
-      // Silently fail
+      const all = await JournalStorage.getAllEntries();
+      setEntries(all);
+      const inRange = await JournalStorage.getEntriesByDateRange(weekStart, weekEnd);
+      setWeekEntries(inRange);
+      const premium = await PremiumService.isPremium();
+      setIsPremium(premium);
+    } catch {
+      /* ignore */
     }
-  };
-
-  const processChartData = (allEntries: JournalEntry[]) => {
-    if (allEntries.length === 0) {
-      setWeeklyData(null);
-      setAverageMood(0); // Explicitly set to 0, not NaN
-      return;
-    }
-
-    // Get last 7 days
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = moment().subtract(6 - i, "days");
-      return {
-        date: date.format("YYYY-MM-DD"),
-        label: date.format("ddd"),
-        timestamp: date.startOf("day").valueOf(),
-      };
-    });
-
-    // Calculate average mood - filter out entries with invalid moods
-    const validEntries = allEntries.filter(entry => {
-      const moodValue = MOOD_VALUES[entry.mood];
-      return moodValue !== undefined && !isNaN(moodValue);
-    });
-    const moodSum = validEntries.reduce((sum, entry) => {
-      const moodValue = MOOD_VALUES[entry.mood];
-      const numValue = Number(moodValue);
-      return sum + (isFinite(numValue) ? numValue : 0);
-    }, 0);
-    
-    // Calculate average and ensure it's never NaN
-    const calculatedAvg = validEntries.length > 0 && isFinite(moodSum) ? moodSum / validEntries.length : 0;
-    const finalAvg = isFinite(calculatedAvg) && !isNaN(calculatedAvg) ? calculatedAvg : 0;
-    
-    // Triple-check before setting state - never set NaN
-    let safeFinalAvg = 0;
-    if (typeof finalAvg === 'number' && isFinite(finalAvg) && !isNaN(finalAvg)) {
-      safeFinalAvg = finalAvg;
-    }
-    
-    // Final validation
-    if (isNaN(safeFinalAvg) || !isFinite(safeFinalAvg)) {
-      safeFinalAvg = 0;
-    }
-    
-    setAverageMood(safeFinalAvg);
-
-    // Group entries by date
-    const entriesByDate = last7Days.map(day => {
-      const dayEntries = allEntries.filter(entry => {
-        const entryDate = moment(entry.timestamp).format("YYYY-MM-DD");
-        return entryDate === day.date;
-      });
-
-      if (dayEntries.length === 0) {
-        return null;
-      }
-
-      // Average mood for the day if multiple entries - filter out invalid moods
-      const validDayEntries = dayEntries.filter(entry => {
-        const moodValue = MOOD_VALUES[entry.mood];
-        return moodValue !== undefined && !isNaN(moodValue);
-      });
-      
-      if (validDayEntries.length === 0) {
-        return null;
-      }
-      
-      const daySum = validDayEntries.reduce((sum, entry) => {
-        const moodValue = MOOD_VALUES[entry.mood];
-        const numValue = Number(moodValue);
-        return sum + (isFinite(numValue) ? numValue : 0);
-      }, 0);
-      const avgMood = validDayEntries.length > 0 && isFinite(daySum) ? daySum / validDayEntries.length : null;
-      const finalAvgMood = avgMood !== null && isFinite(avgMood) && !isNaN(avgMood) ? avgMood : null;
-      return finalAvgMood;
-    });
-
-    // Fill missing days with null and filter out any NaN values
-    // Convert to numbers and ensure all values are finite
-    const data = entriesByDate.map((value) => {
-      if (value === null || value === undefined) return null;
-      const numValue = Number(value);
-      if (!isFinite(numValue) || isNaN(numValue)) {
-        return null;
-      }
-      return numValue;
-    });
-    
-    // Final sanitization - ensure no NaN or invalid values
-    const sanitizedData = data.map((v) => {
-      if (v === null || v === undefined) return null;
-      const num = Number(v);
-      if (!isFinite(num) || isNaN(num)) {
-        return null;
-      }
-      return num;
-    });
-
-    setWeeklyData({
-      labels: last7Days.map(d => d.label),
-      datasets: [
-        {
-          data: sanitizedData,
-          color: (opacity = 1) => theme.colors.primary,
-          strokeWidth: 2,
-        },
-      ],
-    });
-  };
+  }, [weekStart, weekEnd]);
 
   useFocusEffect(
     useCallback(() => {
       loadEntries();
-    }, [])
+    }, [loadEntries])
   );
 
-  const chartConfig = {
-    backgroundColor: theme.colors.white,
-    backgroundGradientFrom: theme.colors.white,
-    backgroundGradientTo: theme.colors.white,
-    decimalPlaces: 1,
-    color: (opacity = 1) => theme.colors.primary,
-    labelColor: (opacity = 1) => theme.colors.textDefault,
-    style: {
-      borderRadius: 16,
-    },
-    propsForDots: {
-      r: "6",
-      strokeWidth: "2",
-      stroke: theme.colors.primary,
-    },
-  };
+  useEffect(() => {
+    loadEntries();
+  }, [loadEntries]);
 
-  const getMoodLabel = (value: number): string => {
-    if (value >= 4.5) return "Very Happy";
-    if (value >= 3.5) return "Happy";
-    if (value >= 2.5) return "Neutral";
-    if (value >= 1.5) return "Low";
-    return "Very Low";
-  };
-
-  const recentEntriesCount = useMemo(() => {
-    if (entries.length === 0) {
-      return 0;
+  useEffect(() => {
+    if (!isSundayOrPast || !isPremium) {
+      setWeeklySummary(null);
+      setLoadingSummary(false);
+      return;
     }
-
-    const startOfWindow = moment().subtract(6, "days").startOf("day");
-    return entries.filter(entry => moment(entry.timestamp).isSameOrAfter(startOfWindow)).length;
-  }, [entries]);
-
-  const latestEntryDate = useMemo(() => {
-    if (entries.length === 0) {
-      return null;
-    }
-
-    const latestTimestamp = entries.reduce(
-      (latest, entry) => (entry.timestamp > latest ? entry.timestamp : latest),
-      entries[0].timestamp
-    );
-
-    return moment(latestTimestamp).format("MMM D, YYYY");
-  }, [entries]);
-
-  const hasRecentMoodData = useMemo(() => {
-    if (!weeklyData) {
-      return false;
-    }
-
-    return weeklyData.datasets.some(dataset => 
-      dataset.data.some((value: number | null) => {
-        if (value === null || value === undefined) return false;
-        const num = Number(value);
-        return typeof num === "number" && isFinite(num) && !isNaN(num);
-      })
-    );
-  }, [weeklyData]);
-
-  // Sanitize weeklyData before rendering to ensure no NaN values
-  const sanitizedWeeklyData = useMemo(() => {
-    if (!weeklyData) return null;
-    
-    const sanitizedDatasets = weeklyData.datasets.map((dataset) => {
-      const sanitizedData = dataset.data.map((value: number | null) => {
-        // Handle null/undefined
-        if (value === null || value === undefined) {
-          return null;
-        }
-        
-        // Convert to number and validate
-        const num = Number(value);
-        if (!isFinite(num) || isNaN(num)) {
-          return null;
-        }
-        
-        return num;
-      });
-      
-      // Verify no NaN in final array and force replace any remaining NaN with null
-      const finalData = sanitizedData.map(v => {
-        if (v !== null && (isNaN(v) || !isFinite(v))) {
-          return null;
-        }
-        return v;
-      });
-      
-      return {
-        ...dataset,
-        data: finalData
-      };
+    let cancelled = false;
+    setLoadingSummary(true);
+    (async () => {
+      const { start, end } = getWeekRange(weekMoment);
+      const es = await JournalStorage.getEntriesByDateRange(start, end);
+      if (cancelled) return;
+      const s = await ensureWeeklySummary(weekId, es);
+      if (!cancelled) setWeeklySummary(s);
+    })().finally(() => {
+      if (!cancelled) setLoadingSummary(false);
     });
-    
-    return {
-      ...weeklyData,
-      datasets: sanitizedDatasets
+    return () => {
+      cancelled = true;
     };
-  }, [weeklyData]);
+  }, [weekId, weekMoment, isSundayOrPast, isPremium]);
+
+  useEffect(() => {
+    if (isSundayOrPast || !isPremium) {
+      setDailyPulse(null);
+      setLoadingDailyPulse(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDailyPulse(true);
+    generateDailyPulse(todayEntries)
+      .then((p) => {
+        if (!cancelled) setDailyPulse(p);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDailyPulse(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSundayOrPast, isPremium, todayEntries]);
+
+  const chartData = useMemo(() => {
+    const labels = weekDays.map((d) => d.label);
+    const values = weekDays.map((d) => {
+      const dayEntries = weekEntries.filter(
+        (e) => moment(e.timestamp).format("YYYY-MM-DD") === d.date
+      );
+      if (dayEntries.length === 0) return null;
+      const valid = dayEntries.filter((e) => {
+        const v = MOOD_VALUES[e.mood];
+        return v != null && isFinite(Number(v));
+      });
+      if (valid.length === 0) return null;
+      const sum = valid.reduce((s, e) => s + (MOOD_VALUES[e.mood] ?? 0), 0);
+      const avg = sum / valid.length;
+      return isFinite(avg) ? avg : null;
+    });
+    return { labels, data: values };
+  }, [weekDays, weekEntries]);
+
+  const hasChartData = chartData.data.some((v) => v != null && isFinite(Number(v)));
+
+  const chartConfig = useMemo(
+    () => ({
+      backgroundColor: theme.colors.white,
+      backgroundGradientFrom: theme.colors.white,
+      backgroundGradientTo: theme.colors.white,
+      decimalPlaces: 0,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- chart API signature
+      color: (opacity = 1) => theme.colors.primary,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- chart API signature
+      labelColor: (opacity = 1) => theme.colors.textDefault,
+      formatYLabel,
+      style: { borderRadius: 16 },
+      propsForDots: {
+        r: "6",
+        strokeWidth: "2",
+        stroke: theme.colors.primary,
+      },
+    }),
+    [theme]
+  );
+
+  const onUnlockPress = useCallback(() => {
+    router.push("/(home)/(tabs)/settings");
+  }, [router]);
+
+  const onShareAura = useCallback(async () => {
+    const weekTitle = weeklySummary?.title ?? "This Week";
+    const moodMix = weekEntries.length
+      ? Object.entries(
+        weekEntries.reduce<Record<string, number>>((acc, e) => {
+          acc[e.mood] = (acc[e.mood] ?? 0) + 1;
+          return acc;
+        }, {})
+      )
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([m]) => m)
+        .join(" ")
+      : "✨";
+    try {
+      await Share.share({
+        message: `My week: ${weekTitle} 🌟 ${moodMix}\n\nShared from My Aura Log`,
+        title: "My Aura",
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [weeklySummary?.title, weekEntries]);
+
+
+
+  const canGoNext = weekOffset < 0;
 
   if (entries.length === 0) {
     return (
-      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.backgroundDefault }]}>
+      <ScrollView
+        contentContainerStyle={[styles.container, { backgroundColor: theme.colors.backgroundDefault }]}
+      >
         <StatusBar style="dark" />
         <Box padding="l" alignItems="center" justifyContent="center" flex={1} minHeight={400}>
           <Text variant="h3" marginBottom="m" color="textSubdued">
@@ -266,199 +226,351 @@ function Trends() {
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.backgroundDefault }]}>
+    <ScrollView
+      contentContainerStyle={[styles.container, { backgroundColor: theme.colors.backgroundDefault }]}
+    >
       <StatusBar style="dark" />
-      <Box padding="m" paddingTop="xxxl">
-        <Text variant="h2-pacifico" marginBottom="xs" textAlign={"center"} color="textDefault">
-          Mood Trends
-        </Text>
-        <Text variant="default" marginBottom="s" color="textSubdued" textAlign="center">
-          Visualize how your reflections stack up, how the week has felt, and which moods show up the most.
-        </Text>
 
-        {/* Stats Cards */}
-        <Box flexDirection="row" marginBottom="m" gap="m">
-          <Box
-            flex={1}
-            padding="m"
-            borderRadius="m"
-            style={{
-              backgroundColor: theme.colors.white,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 2,
-            }}>
-            <Text variant="h7" color="textSubdued" marginBottom="xs">
-              Journal Entries Logged
-            </Text>
-            <Text variant="h2" color="primary">
-              {entries.length}
-            </Text>
-            {latestEntryDate && (
-              <Text variant="h7" color="textSubdued">
-                Latest entry • {latestEntryDate}
-              </Text>
-            )}
-          </Box>
-          <Box
-            flex={1}
-            padding="m"
-            borderRadius="m"
-            style={{
-              backgroundColor: theme.colors.white,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 2,
-            }}>
-            <Text variant="h7" color="textSubdued" marginBottom="xs">
-              Overall Mood Score
-            </Text>
-            <Text variant="h2" color="primary">
-              {safeAverageMood.toFixed(1)}
-            </Text>
-            <Text variant="h7" color="textSubdued">
-              Feels {getMoodLabel(safeAverageMood)} on average
-            </Text>
-            <Text variant="h7" color="textSubdued">
-              Across {entries.length} {entries.length === 1 ? "entry" : "entries"}
-            </Text>
-          </Box>
-        </Box>
+      {/* Week navigator */}
+      <Box flexDirection="row" alignItems="center" justifyContent="space-between" paddingHorizontal="m" paddingTop="xxxl" marginBottom="s">
+        <TouchableOpacity
+          onPress={() => setWeekOffset((o) => o - 1)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={styles.arrowHit}
+        >
+          <Text variant="h3" color="primary">‹</Text>
+        </TouchableOpacity>
+        <Text variant="h5" color="textDefault" numberOfLines={1}>
+          {formatWeekRange(weekMoment)}
+        </Text>
+        <TouchableOpacity
+          onPress={() => canGoNext && setWeekOffset((o) => o + 1)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={styles.arrowHit}
+          disabled={!canGoNext}
+        >
+          <Text variant="h3" color={canGoNext ? "primary" : "textDisabled"}>›</Text>
+        </TouchableOpacity>
+      </Box>
 
-        <Box
-          marginBottom="m"
-          padding="m"
-          borderRadius="m"
-          style={{
-            backgroundColor: theme.colors.white,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
-          }}>
-          <Text variant="h7" color="textSubdued" marginBottom="xs">
-            Entries Logged This Week
+      <Text variant="default" marginBottom="m" color="textSubdued" textAlign="center" paddingHorizontal="m">
+        {isCurrentWeek
+          ? "This week: fill the days as you go."
+          : "Past week: your reflection is saved."}
+      </Text>
+
+      {/* Oracle: Daily Pulse (Mon–Sat) or Weekly Reflection (Sun / past) */}
+      <Box paddingHorizontal="m" marginBottom="m">
+        <OracleCard
+          isWeekly={isSundayOrPast}
+          isPremium={isPremium}
+          onUnlockPress={onUnlockPress}
+          dailyPulse={dailyPulse}
+          loadingDailyPulse={loadingDailyPulse}
+          weeklySummary={weeklySummary}
+          loading={loadingSummary}
+          onShare={onShareAura}
+          theme={theme}
+        />
+      </Box>
+
+      {/* Weekly Rhythm chart */}
+      <Box
+        marginHorizontal="m"
+        marginBottom="m"
+        borderRadius="m"
+        style={{
+          backgroundColor: theme.colors.white,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 2,
+        }}
+      >
+        <Box padding="m">
+          <Text variant="h4" marginBottom="s" color="textDefault">
+            Weekly Rhythm
           </Text>
-          <Text variant="h2" color="primary">
-            {recentEntriesCount}
-          </Text>
-          <Text variant="h7" color="textSubdued">
-            Past 7 days
+          <Text variant="default" color="textSubdued">
+            Mon–Sun: daily average mood.
           </Text>
         </Box>
-
-        {/* Weekly Chart */}
-        {sanitizedWeeklyData && (
-          <Box
-            borderRadius="m"
-            style={{
-              backgroundColor: theme.colors.white,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 2,
-            }}>
-            <Box padding="m">
-              <Text variant="h4" marginBottom="s" color="textDefault">
-                Mood Trend This Week
-              </Text>
-              <Text variant="default" color="textSubdued">
-                Daily average mood over the past 7 days. Scores range from 1 (tougher days) to 5 (very positive days).
-              </Text>
-            </Box>
-            {hasRecentMoodData ? (
-              <LineChart
-                data={sanitizedWeeklyData}
-                width={screenWidth - 64}
-                height={250}
-                chartConfig={chartConfig}
-                bezier
-                withInnerLines={true}
-                withOuterLines={true}
-                withVerticalLines={false}
-                withHorizontalLines={true}
-                withDots={true}
-                withShadow={false}
-              />
-            ) : (
-              <Box padding="m">
-                <Text variant="default" color="textSubdued" textAlign="center">
-                  No entries in the last 7 days yet. Log a few reflections to bring this trend chart to life.
-                </Text>
-              </Box>
-            )}
+        {hasChartData ? (
+          <LineChart
+            data={{
+              labels: chartData.labels,
+              datasets: [
+                {
+                  data: chartData.data.map((v) => (v != null && isFinite(v) ? v : 0)) as number[],
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- chart API signature
+                  color: (_opacity = 1) => theme.colors.primary,
+                  strokeWidth: 2,
+                },
+              ],
+            }}
+            width={screenWidth - 64}
+            height={250}
+            chartConfig={chartConfig}
+            bezier
+            withInnerLines
+            withOuterLines
+            withVerticalLines={false}
+            withHorizontalLines
+            withDots
+            withShadow={false}
+            formatYLabel={formatYLabel}
+          />
+        ) : (
+          <Box padding="m">
+            <Text variant="default" color="textSubdued" textAlign="center">
+              {isCurrentWeek
+                ? "No entries in this week yet. Log a few to see your rhythm."
+                : "No entries in that week."}
+            </Text>
           </Box>
         )}
+      </Box>
 
-        {/* Mood Distribution */}
-        <Box marginTop="m">
-          <Text variant="h4" marginBottom="xs" color="textDefault">
-            Mood Mix (All Time)
-          </Text>
-          <Text variant="default" marginBottom="m" color="textSubdued">
-            Shows how often each mood appears across every entry you have logged so far.
-          </Text>
-          <Box
-            padding="m"
-            borderRadius="m"
-            style={{
-              backgroundColor: theme.colors.white,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 2,
-            }}>
-            {Object.entries(
-              entries.reduce((acc, entry) => {
-                acc[entry.mood] = (acc[entry.mood] || 0) + 1;
-                return acc;
-              }, {} as Record<string, number>)
-            )
-              .sort((a, b) => b[1] - a[1])
-              .map(([mood, count]) => {
-                const percentage = entries.length > 0 ? (count / entries.length) * 100 : 0;
-                return (
-                  <Box key={mood} marginBottom="m">
-                    <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="xs">
-                      <Text variant="h5" color="textDefault">
-                        {`${mood} ${MOOD_LABELS[mood as keyof typeof MOOD_LABELS] || 'Unknown'}`}
-                      </Text>
-                      <Text variant="h6" color="textSubdued">
-                        {percentage.toFixed(0)}%
-                      </Text>
-                    </Box>
-                    <Text variant="h7" color="textSubdued" marginBottom="xs">
-                      Logged {count} {count === 1 ? "time" : "times"}
-                    </Text>
-                    <Box
-                      height={8}
-                      borderRadius="s"
-                      style={{ backgroundColor: theme.colors.backgroundHovered }}
-                      overflow="hidden">
-                      <Box height="100%" width={`${percentage}%`} style={{ backgroundColor: theme.colors.primary }} />
-                    </Box>
-                  </Box>
-                );
-              })}
-          </Box>
-        </Box>
+      {/* Mood Mix (for this week or all-time for current week) */}
+      <Box paddingHorizontal="m" marginBottom="xl">
+        <Text variant="h4" marginBottom="xs" color="textDefault">
+          Mood Mix {isCurrentWeek ? "This Week" : "That Week"}
+        </Text>
+        <Text variant="default" marginBottom="m" color="textSubdued">
+          How often each mood showed up.
+        </Text>
+        <MoodMixBlock entries={weekEntries} theme={theme} />
       </Box>
     </ScrollView>
   );
 }
 
+function OracleCard({
+  isWeekly,
+  isPremium,
+  onUnlockPress,
+  dailyPulse,
+  loadingDailyPulse,
+  weeklySummary,
+  loading,
+  onShare,
+  theme,
+}: {
+  isWeekly: boolean;
+  isPremium: boolean;
+  onUnlockPress: () => void;
+  dailyPulse: DailyPulse | null;
+  loadingDailyPulse: boolean;
+  weeklySummary: WeeklySummary | null;
+  loading: boolean;
+  onShare: () => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  const unlockCta = (
+    <TouchableOpacity onPress={onUnlockPress} activeOpacity={0.8}>
+      <Box
+        flexDirection="row"
+        alignItems="center"
+        alignSelf="flex-start"
+        paddingVertical="s"
+        paddingHorizontal="m"
+        marginTop="s"
+        borderRadius="m"
+        style={{ backgroundColor: "rgba(155,135,245,0.25)" }}
+      >
+        <Text variant="button" color="primary">Unlock Premium</Text>
+      </Box>
+    </TouchableOpacity>
+  );
+
+  return (
+    <Box
+      borderRadius="l"
+      overflow="hidden"
+      style={{
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        elevation: 4,
+      }}
+    >
+      <LinearGradient
+        colors={["#E8E0F5", "#D4E8F5", "#E8E0F5"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ padding: 20 }}
+      >
+        {isWeekly ? (
+          <>
+            <Text variant="h5" marginBottom="xs" color="textDefault">
+              The Week of {weeklySummary?.title ?? "…"}
+            </Text>
+            {!isPremium ? (
+              <>
+                <Text variant="default" color="textSubdued">
+                  Unlock Premium to see your Weekly Reflection.
+                </Text>
+                {unlockCta}
+              </>
+            ) : loading ? (
+              <Box flexDirection="row" alignItems="center" gap="s" paddingVertical="m">
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text variant="default" color="textSubdued">Preparing your reflection…</Text>
+              </Box>
+            ) : weeklySummary ? (
+              <>
+                <Text variant="default" color="textDefault" marginBottom="s">
+                  {weeklySummary.arc}
+                </Text>
+                <Text variant="default" color="textDefault" marginBottom="s">
+                  {weeklySummary.connection}
+                </Text>
+                <Text variant="default" color="textDefault" marginBottom="m">
+                  {weeklySummary.nudge}
+                </Text>
+                <TouchableOpacity onPress={onShare} activeOpacity={0.8}>
+                  <Box
+                    flexDirection="row"
+                    alignItems="center"
+                    alignSelf="flex-start"
+                    paddingVertical="s"
+                    paddingHorizontal="m"
+                    borderRadius="m"
+                    style={{ backgroundColor: "rgba(155,135,245,0.25)" }}
+                  >
+                    <Text variant="button" color="primary">Share your Aura</Text>
+                  </Box>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text variant="default" color="textSubdued">
+                No entries that week to reflect on.
+              </Text>
+            )}
+          </>
+        ) : (
+          <>
+            <Text variant="h5" marginBottom="xs" color="textDefault">
+              Your Aura Today
+            </Text>
+            {!isPremium ? (
+              <>
+                <Text variant="default" color="textSubdued">
+                  Unlock Premium to see Your Aura Today.
+                </Text>
+                {unlockCta}
+              </>
+            ) : loadingDailyPulse ? (
+              <Box flexDirection="row" alignItems="center" gap="s" paddingVertical="m">
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text variant="default" color="textSubdued">Reading your aura…</Text>
+              </Box>
+            ) : dailyPulse ? (
+              <>
+                <Text variant="default" color="textDefault" marginBottom="s">
+                  {dailyPulse.line1} {dailyPulse.line2}
+                </Text>
+                <Text variant="default" color="textSubdued">
+                  {dailyPulse.nudge}
+                </Text>
+              </>
+            ) : (
+              <Text variant="default" color="textSubdued">
+                Check in to see your Daily Pulse.
+              </Text>
+            )}
+          </>
+        )}
+      </LinearGradient>
+    </Box>
+  );
+}
+
+function MoodMixBlock({
+  entries,
+  theme,
+}: {
+  entries: JournalEntry[];
+  theme: ReturnType<typeof useTheme>;
+}) {
+  const mix = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const e of entries) {
+      acc[e.mood] = (acc[e.mood] ?? 0) + 1;
+    }
+    return Object.entries(acc).sort((a, b) => b[1] - a[1]);
+  }, [entries]);
+
+  if (mix.length === 0) {
+    return (
+      <Box padding="m" borderRadius="m" style={{ backgroundColor: theme.colors.white }}>
+        <Text variant="default" color="textSubdued">No mood data for this week.</Text>
+      </Box>
+    );
+  }
+
+  const total = mix.reduce((s, [, c]) => s + c, 0);
+  return (
+    <Box
+      padding="m"
+      borderRadius="m"
+      style={{
+        backgroundColor: theme.colors.white,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+      }}
+    >
+      {mix.map(([mood, count]) => {
+        const pct = total > 0 ? (count / total) * 100 : 0;
+        return (
+          <Box key={mood} marginBottom="m">
+            <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="xs">
+              <Text variant="h5" color="textDefault">
+                {mood} {MOOD_LABELS[mood as keyof typeof MOOD_LABELS] ?? "—"}
+              </Text>
+              <Text variant="h6" color="textSubdued">{pct.toFixed(0)}%</Text>
+            </Box>
+            <Box
+              height={8}
+              borderRadius="s"
+              style={{ backgroundColor: theme.colors.backgroundHovered }}
+              overflow="hidden"
+            >
+              <Box
+                height="100%"
+                width={`${pct}%`}
+                style={{ backgroundColor: theme.colors.primary }}
+              />
+            </Box>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
+  container: { flexGrow: 1 },
+  arrowHit: { padding: 8 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalBox: {
+    borderRadius: 16,
+    padding: 20,
+    maxWidth: 320,
+    width: "100%",
   },
 });
 
 export default Trends;
-
