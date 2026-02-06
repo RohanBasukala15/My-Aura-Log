@@ -1,13 +1,28 @@
-import React from "react";
-import { Tabs } from "expo-router";
+import React, { useEffect } from "react";
+import { Tabs, usePathname } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppFonts, useTheme } from "@common/components";
+import { trackScreenView, trackTabNavigation } from "@common/services/analyticsService";
 
 function BottomTab() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+
+  // Track tab navigation when pathname changes
+  useEffect(() => {
+    if (pathname) {
+      // Extract tab name from pathname (e.g., "/(home)/(tabs)/dashboard" -> "dashboard")
+      const tabMatch = pathname.match(/\(tabs\)\/([^/]+)/);
+      if (tabMatch) {
+        const tabName = tabMatch[1];
+        trackTabNavigation(tabName);
+        trackScreenView(`tabs_${tabName}`);
+      }
+    }
+  }, [pathname]);
 
   const screenOptions = {
     headerShown: false,

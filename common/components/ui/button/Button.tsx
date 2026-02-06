@@ -14,8 +14,10 @@ import {
   BackgroundColorProps,
   composeRestyleFunctions,
 } from "@shopify/restyle";
+import { usePathname } from "expo-router";
 
 import { Box, Text, useTheme, Theme, makeStyles } from "../../theme";
+import { trackButtonPress } from "@common/services/analyticsService";
 
 import { baseStyleComposer, coreStyleComposer, labelStyleComposer } from "./Button.style";
 
@@ -47,6 +49,10 @@ export type ButtonProps = {
   style?: RectButtonProps["style"];
   labelVariant?: React.ComponentProps<typeof Text>["variant"];
   labelColor?: React.ComponentProps<typeof Text>["color"];
+  /** Analytics: Track button press. If true, uses label as button name. Can also be a string for custom name. */
+  trackPress?: boolean | string;
+  /** Analytics: Additional parameters to track with button press */
+  trackParams?: Record<string, any>;
 } & ThemeProps;
 
 const ButtonDelicate = React.forwardRef(function ButtonDelicate(
@@ -67,12 +73,15 @@ const ButtonDelicate = React.forwardRef(function ButtonDelicate(
     labelStyle: labelStyleDelicate = undefined,
     containerStyle: containerStyleDelicate = undefined,
     labelProps = {},
+    trackPress = false,
+    trackParams,
     ...rest
   }: ButtonProps,
   ref: ForwardedRef<React.ComponentRef<typeof RectButton>>
 ) {
   const { colors, sizeVariant } = useTheme();
   const reStyle = useRestyle(restyleFunctions, rest);
+  const pathname = usePathname();
 
   const coreStyles = makeStyles(coreStyleComposer);
   const labelStyles = makeStyles(labelStyleComposer);
@@ -115,11 +124,31 @@ const ButtonDelicate = React.forwardRef(function ButtonDelicate(
     [labelStyle, containerSize]
   );
 
+  // Handle button press with analytics tracking
+  const handlePress = () => {
+    // Track button press if enabled
+    if (trackPress && !disabled && !loading) {
+      const buttonName = typeof trackPress === 'string' ? trackPress : label;
+      // Extract location from pathname (e.g., "/(home)/(tabs)/dashboard" -> "dashboard")
+      const location = pathname?.match(/\(tabs\)\/([^/]+)/)?.[1] || 
+                      pathname?.replace(/^\//, '').replace(/\//g, '_') || 
+                      'unknown';
+      trackButtonPress(buttonName, location, {
+        variant,
+        size,
+        ...trackParams,
+      });
+    }
+    
+    // Call original onPress handler
+    onPress?.();
+  };
+
   return (
     <Box style={StyleSheet.flatten([coreStyles.baseContainer, containerSize, baseStyle, reStyle, style])}>
       <RectButton
         ref={ref}
-        onPress={onPress}
+        onPress={handlePress}
         rippleColor={colors.secondary}
         enabled={!disabled && !loading}
         style={[

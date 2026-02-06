@@ -72,22 +72,24 @@ module.exports = ({ config }) => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
-      buildNumber: "5",
+      buildNumber: "6",
+      googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
       }
     },
-    android: {
+    android: { 
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
-      versionCode: 8,
+      versionCode: 9,
       permissions: ["android.permission.CAMERA"],
       privacy: {
         privacyPolicy: "https://rohanbasukala15.github.io/My-Aura-Log/privacy-policy.html",
       },
+      googleServicesFile: "./google-services.json",
     },
     plugins: [
       "expo-mail-composer",
@@ -137,10 +139,11 @@ module.exports = ({ config }) => {
         },
       ],
       withNotificationColorOverride,
+      "@react-native-firebase/app",
     ],
     updates: {
       fallbackToCacheTimeout: 1200,
-      url: "https://u.expo.dev/489d329b-044e-4fef-be78-43dd072cd456",
+      "url": "https://u.expo.dev/90b03824-3a3e-4ee2-a500-68b936989cb3",
     },
     owner: "rohanbasukala15",
     "extra": {

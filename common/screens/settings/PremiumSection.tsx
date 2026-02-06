@@ -18,6 +18,8 @@ type PremiumSectionProps = {
   onRestorePurchases: () => void;
   onInviteFriends: () => void;
   onOpenReferralModal: () => void;
+  onPrivacyPolicy?: () => void;
+  onTermsOfUse?: () => void;
 };
 
 export function PremiumSection({
@@ -34,6 +36,8 @@ export function PremiumSection({
   onRestorePurchases,
   onInviteFriends,
   onOpenReferralModal,
+  onPrivacyPolicy,
+  onTermsOfUse,
 }: PremiumSectionProps) {
   const theme = useTheme();
 
@@ -94,13 +98,16 @@ export function PremiumSection({
                   <Text variant="button" style={styles.premiumButtonText}>
                     ⭐ Monthly Premium
                   </Text>
-                  {monthlyPrice && <Text variant="caption" style={styles.priceText}>
-                    {monthlyPrice}/months
-                  </Text>}
+                  <Text variant="caption" style={styles.priceText}>
+                    {monthlyPrice ? `${monthlyPrice} / month` : "Loading price..."}
+                  </Text>
                 </Box>
               )}
             </LinearGradient>
           </TouchableOpacity>
+          <Text variant="caption" color="textSubdued" marginTop="xs" marginBottom="s" textAlign="center">
+            Auto-renewable monthly subscription. Cancel anytime in device Settings.
+          </Text>
 
           {/* Lifetime Purchase Option */}
           <TouchableOpacity
@@ -137,6 +144,29 @@ export function PremiumSection({
               </Text>
             )}
           </TouchableOpacity>
+          {(onPrivacyPolicy || onTermsOfUse) && (
+            <Box marginTop="m" flexDirection="row" flexWrap="wrap" justifyContent="center" alignItems="center" gap="s">
+              {onPrivacyPolicy && (
+                <TouchableOpacity onPress={onPrivacyPolicy} style={styles.legalLink}>
+                  <Text variant="caption" color="primary">
+                    Privacy Policy
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {onPrivacyPolicy && onTermsOfUse && (
+                <Text variant="caption" color="textSubdued">
+                  •
+                </Text>
+              )}
+              {onTermsOfUse && (
+                <TouchableOpacity onPress={onTermsOfUse} style={styles.legalLink}>
+                  <Text variant="caption" color="primary">
+                    Terms of Use (EULA)
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </Box>
+          )}
           {remainingAI >= 0 && (
             <Box
               marginBottom="m"
@@ -262,6 +292,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
+  },
+  legalLink: {
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
   inviteButton: {
     borderRadius: 12,

@@ -533,6 +533,7 @@ interface SecurityStepProps {
 }
 
 function SecurityStep({ step, biometricEnabled, onBiometricChange, onNext }: SecurityStepProps) {
+  const theme = useTheme();
   const { isAvailable, type } = useBiometricAvailability();
   const biometricTypeName = formatBiometricType(type);
   const dispatch = useAppDispatch();
@@ -572,7 +573,8 @@ function SecurityStep({ step, biometricEnabled, onBiometricChange, onNext }: Sec
     <OnboardingStepLayout
       step={step}
       content={
-        isAvailable ? (
+        <Box width="100%" gap="m">
+          {/* Data privacy assurance - clear reassurance for users */}
           <Box
             padding="m"
             backgroundColor="surfaceDefault"
@@ -580,26 +582,51 @@ function SecurityStep({ step, biometricEnabled, onBiometricChange, onNext }: Sec
             shadowOffset={{ width: 0, height: 4 }}
             shadowOpacity={0.08}
             shadowRadius={12}
-            elevation={4}>
-            <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-              <Box flex={1}>
-                <Text variant="default" color="textDefault" style={{ marginBottom: 4 }}>
-                  Enable {biometricTypeName}
-                </Text>
-                <Text variant="caption" color="textSubdued">
-                  Use {biometricTypeName} to quickly and securely access your Aura Log
-                </Text>
-              </Box>
-              <Switch value={biometricEnabled} onValueChange={handleBiometricToggle} />
-            </Box>
-          </Box>
-        ) : (
-          <Box padding="m" backgroundColor="surfaceDefault" borderRadius="m">
-            <Text variant="default" color="textSubdued" textAlign="center">
-              Biometric authentication is not available on this device
+            elevation={4}
+            style={{
+              borderLeftWidth: 6,
+              borderRightWidth: 6,
+              borderRightColor: theme.colors.primary,
+              borderLeftColor: theme.colors.primary,
+            }}>
+            <Text variant="default" color="textDefault" fontWeight="600" marginBottom="xs">
+              Your data is secure
+            </Text>
+            <Text variant="caption" color="textSubdued" lineHeight={20}>
+              All journal entries are stored only on your device—nowhere else. Only you have access to your personal
+              reflections.
             </Text>
           </Box>
-        )
+
+          {isAvailable ? (
+            <Box
+              padding="m"
+              backgroundColor="surfaceDefault"
+              borderRadius="m"
+              shadowOffset={{ width: 0, height: 4 }}
+              shadowOpacity={0.08}
+              shadowRadius={12}
+              elevation={4}>
+              <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+                <Box flex={1}>
+                  <Text variant="default" color="textDefault" style={{ marginBottom: 4 }}>
+                    Enable {biometricTypeName}
+                  </Text>
+                  <Text variant="caption" color="textSubdued">
+                    Use {biometricTypeName} to quickly and securely access your Aura Log
+                  </Text>
+                </Box>
+                <Switch value={biometricEnabled} onValueChange={handleBiometricToggle} />
+              </Box>
+            </Box>
+          ) : (
+            <Box padding="m" backgroundColor="surfaceDefault" borderRadius="m">
+              <Text variant="default" color="textSubdued" textAlign="center">
+                Biometric authentication is not available on this device
+              </Text>
+            </Box>
+          )}
+        </Box>
       }
       buttons={
         <Box width="100%" gap="s">

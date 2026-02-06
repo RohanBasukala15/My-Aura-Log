@@ -44,7 +44,7 @@ const AppConstants = {
     user: "/api/v1/user",
   },
   Resources: {
-    bloodGroups: ["A+", "B+", "AB+", "O+", "A-", "B-", "AB-", "O-"],
+    contactEmail: "myauralog@gmail.com",
   },
 };
 

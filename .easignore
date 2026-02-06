@@ -1,0 +1,4 @@
+# Include Firebase config files for EAS builds
+# (These are gitignored but needed for builds)
+!google-services.json
+!GoogleService-Info.plist

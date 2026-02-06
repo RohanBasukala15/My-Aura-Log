@@ -31,6 +31,16 @@ function HomeLayout() {
       />
       <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
       <Stack.Screen name="terms" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="paywall"
+        options={{
+          presentation: "modal",
+          animation: "slide_from_bottom",
+          headerShown: false,
+          gestureEnabled: true,
+          gestureDirection: "vertical",
+        }}
+      />
     </Stack>
   );
 }

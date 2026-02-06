@@ -1,8 +1,9 @@
-import React from "react";
-import { Redirect } from "expo-router";
+import React, { useEffect } from "react";
+import { Redirect, usePathname } from "expo-router";
 
 import { ActivityIndicator, Box, useAppConfiguration } from "@common/components";
 import { useAppSelector } from "@common/redux";
+import { trackScreenView } from "@common/services/analyticsService";
 
 const LoadingScreen = () => (
   <Box flex={1} alignItems="center" justifyContent="center">
@@ -15,6 +16,20 @@ export default function EntryPoint() {
   const { isOnboardingCompleted, isBiometricSetupRequired } = useAppSelector(
     (state) => state.appConfiguration
   );
+  const pathname = usePathname();
+
+  // Track screen view
+  useEffect(() => {
+    if (isReady && isUIReady) {
+      if (!isOnboardingCompleted) {
+        trackScreenView(pathname || 'onboarding');
+      } else if (isBiometricSetupRequired) {
+        trackScreenView(pathname || 'login_with_biometric');
+      } else {
+        trackScreenView(pathname || 'entry_point');
+      }
+    }
+  }, [isReady, isUIReady, isOnboardingCompleted, isBiometricSetupRequired, pathname]);
 
   if (!isReady || !isUIReady) {
     return <LoadingScreen />;

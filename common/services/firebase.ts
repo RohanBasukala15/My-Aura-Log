@@ -1,72 +1,46 @@
-/**
- * Firebase Configuration for React Native (Expo)
- * 
- * NOTE: Using Firebase Web SDK which works with Expo on Android & iOS
- * 
- * SETUP INSTRUCTIONS (Android First):
- * 1. Install Firebase: npm install firebase
- * 2. Go to https://console.firebase.google.com/
- * 3. Create a new project (or use existing)
- * 4. Go to Project Settings > General
- * 5. Scroll down to "Your apps" section
- * 6. Click the Android icon (🤖) to add Android app
- * 7. Package name: com.myauralog (from app.config.js)
- * 8. Download google-services.json (we'll use web config instead)
- * 9. Click the web icon (</>) to add a web app
- * 10. Copy the config values and paste them below
- * 11. Save this file
- */
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { Analytics, getAnalytics } from 'firebase/analytics';
 
-// Try to import Firebase Web SDK (works with Expo on Android/iOS)
-let initializeApp: any = null;
-let getFirestore: any = null;
-
-try {
-    // Firebase Web SDK works with Expo on both Android and iOS
-    const firebaseApp = require('firebase/app');
-    const firestore = require('firebase/firestore');
-    initializeApp = firebaseApp.initializeApp;
-    getFirestore = firestore.getFirestore;
-} catch (error) {
-    // Functions will be null if Firebase is not installed
-}
-
-// TODO: Replace these with your actual Firebase config values from Firebase Console
 const firebaseConfig = {
-    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyA3YC5yNeziYYJmLC58ej2xUUKXctVgjeg",
-    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "my-aura-log.firebaseapp.com",
-    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "my-aura-log",
-    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "my-aura-log.firebasestorage.app",
-    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1037142646223",
-    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:1037142646223:web:9a7be1cab6d156113cc6ba"
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Check if Firebase is configured (all values filled in)
-const isFirebaseConfigured =
-    firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" &&
-    firebaseConfig.apiKey.includes("AIza") && // Valid API key format
-    firebaseConfig.projectId !== "YOUR_PROJECT_ID" &&
-    firebaseConfig.appId !== "YOUR_APP_ID" &&
-    firebaseConfig.appId !== "YOUR_WEB_APP_ID_HERE" &&
-    firebaseConfig.appId.includes(":web:"); // Valid web app ID format
+// Fail fast if env vars are missing
+const missingKeys = Object.entries(firebaseConfig)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
 
-let app: any = null;
-let db: any = null;
+if (missingKeys.length > 0) {
+    throw new Error(
+        `Missing Firebase environment variables: ${missingKeys.join(', ')}.\n` +
+        `Add them to your .env file with the EXPO_PUBLIC_ prefix.`
+    );
+}
 
-// Initialize Firebase only if configured and installed
-if (isFirebaseConfigured && initializeApp && getFirestore) {
-    try {
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-    } catch (error) {
-        app = null;
-        db = null;
+const app = initializeApp(firebaseConfig as Record<string, string>);
+const db = getFirestore(app);
+
+// Check if Firebase is properly configured
+const isFirebaseConfigured = !missingKeys.length && !!app;
+
+// Initialize Analytics - works in dev builds, not in Expo Go
+// Will gracefully fail if Analytics is not available (e.g., in Expo Go)
+let analytics: Analytics | null = null;
+try {
+    analytics = getAnalytics(app);
+} catch (error) {
+    // Analytics not available (e.g., Expo Go, or Analytics not enabled in Firebase)
+    // This is expected in some environments, so we silently continue
+    if (__DEV__) {
+        console.log('Firebase Analytics not available:', error instanceof Error ? error.message : 'Unknown error');
     }
 }
 
-// Export Firebase instances
-export { db, app, isFirebaseConfigured };
-
-// Export default app
+export { db, analytics, isFirebaseConfigured };
 export default app;
-
