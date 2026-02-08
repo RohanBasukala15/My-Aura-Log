@@ -28,7 +28,7 @@ function mergeDeep(target, ...sources) {
   return mergeDeep(target, ...sources);
 }
 
-const extractValue = (value) => {
+const extractValue = value => {
   if (value.startsWith("[") && value.endsWith("]")) {
     return value.replace("[", "").replace("]", "").split(",").filter(Boolean);
   }
@@ -48,7 +48,7 @@ const prepareConfigFromEnv = () => {
       const keys = key
         .replace("EXPO_CONFIG_", "")
         .split("_")
-        .map((part) => part);
+        .map(part => part);
       keys.reduce((obj, k, index) => {
         obj[k] = obj[k] || (index === keys.length - 1 ? extractValue(value) : {});
         return obj[k];
@@ -72,19 +72,19 @@ module.exports = ({ config }) => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
-      buildNumber: "6",
+      buildNumber: "8",
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
-        ITSAppUsesNonExemptEncryption: false
-      }
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
-    android: { 
+    android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
-      versionCode: 9,
+      versionCode: 10,
       permissions: ["android.permission.CAMERA"],
       privacy: {
         privacyPolicy: "https://rohanbasukala15.github.io/My-Aura-Log/privacy-policy.html",
@@ -103,15 +103,15 @@ module.exports = ({ config }) => {
         "expo-build-properties",
         {
           android: {
-            usesCleartextTraffic
+            usesCleartextTraffic,
           },
           ios: {
             useFrameworks: "static",
             allowNonModularIncludesInFrameworkModules: true,
             buildReactNativeFromSource: true,
-            deploymentTarget: "15.1"
-          }
-        }
+            deploymentTarget: "15.1",
+          },
+        },
       ],
       [
         "expo-notifications",
@@ -143,17 +143,17 @@ module.exports = ({ config }) => {
     ],
     updates: {
       fallbackToCacheTimeout: 1200,
-      "url": "https://u.expo.dev/90b03824-3a3e-4ee2-a500-68b936989cb3",
+      url: "https://u.expo.dev/90b03824-3a3e-4ee2-a500-68b936989cb3",
     },
     owner: "rohanbasukala15",
-    "extra": {
-      "eas": {
-        "projectId": "90b03824-3a3e-4ee2-a500-68b936989cb3"
-      }
+    extra: {
+      eas: {
+        projectId: "90b03824-3a3e-4ee2-a500-68b936989cb3",
+      },
     },
     runtimeVersion: {
-      policy: "appVersion"
-    }
+      policy: "appVersion",
+    },
   };
 
   const finalConfig = mergeDeep({}, config, envConfig, overridesConfig);
@@ -168,3 +168,4 @@ module.exports = ({ config }) => {
 
   return finalConfig;
 };
+

@@ -1,6 +1,5 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { Analytics, getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
     apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -29,18 +28,7 @@ const db = getFirestore(app);
 // Check if Firebase is properly configured
 const isFirebaseConfigured = !missingKeys.length && !!app;
 
-// Initialize Analytics - works in dev builds, not in Expo Go
-// Will gracefully fail if Analytics is not available (e.g., in Expo Go)
-let analytics: Analytics | null = null;
-try {
-    analytics = getAnalytics(app);
-} catch (error) {
-    // Analytics not available (e.g., Expo Go, or Analytics not enabled in Firebase)
-    // This is expected in some environments, so we silently continue
-    if (__DEV__) {
-        console.log('Firebase Analytics not available:', error instanceof Error ? error.message : 'Unknown error');
-    }
-}
-
-export { db, analytics, isFirebaseConfigured };
+// Do NOT use firebase/analytics (getAnalytics) in React Native - it expects a browser DOM
+// (document.getElementsByTagName) and will throw. Use @react-native-firebase/analytics in analyticsService instead.
+export { db, isFirebaseConfigured };
 export default app;

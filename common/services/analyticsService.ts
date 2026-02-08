@@ -1,12 +1,8 @@
-
-import { analytics, isFirebaseConfigured } from './firebase';
-import { logEvent as firebaseLogEvent } from 'firebase/analytics';
-
-const logEvent = firebaseLogEvent;
+import { isFirebaseConfigured } from './firebase';
+import analytics from '@react-native-firebase/analytics';
 
 export const trackEvent = (eventName: string, params?: Record<string, any>) => {
-  if (!isFirebaseConfigured || !analytics) {
-    // Silently fail in development or if Firebase is not configured
+  if (!isFirebaseConfigured) {
     if (__DEV__) {
       console.log('[Analytics]', eventName, params || {});
     }
@@ -14,14 +10,16 @@ export const trackEvent = (eventName: string, params?: Record<string, any>) => {
   }
 
   try {
-    logEvent(analytics, eventName, params);
+    analytics().logEvent(eventName, params);
   } catch (error) {
-    console.error('Error tracking event:', error);
+    if (__DEV__) {
+      console.warn('Analytics logEvent failed:', error);
+    }
   }
 };
 
 export const trackScreenView = (screenName: string, screenClass?: string) => {
-  if (!isFirebaseConfigured || !analytics) {
+  if (!isFirebaseConfigured) {
     if (__DEV__) {
       console.log('[Analytics Screen]', screenName);
     }
@@ -29,12 +27,14 @@ export const trackScreenView = (screenName: string, screenClass?: string) => {
   }
 
   try {
-    logEvent(analytics, 'screen_view_event', {
+    analytics().logScreenView({
       screen_name: screenName,
       screen_class: screenClass || screenName,
     });
   } catch (error) {
-    console.error('Error tracking screen view:', error);
+    if (__DEV__) {
+      console.warn('Analytics logScreenView failed:', error);
+    }
   }
 };
 

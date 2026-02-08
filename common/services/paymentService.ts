@@ -16,14 +16,18 @@ const REVENUECAT_API_KEY = Platform.select({
  * RevenueCat configuration constants
  * CRITICAL: These PRODUCT_IDs must match your App Store/Google Play product IDs exactly
  */
-const PRODUCT_ID_LIFETIME = "premium_lifetime"; // One-time purchase
+const PRODUCT_ID_LIFETIME = Platform.select({
+  android: "premium_lifetime",
+  ios: "lifetime_premium",
+  default: "premium_lifetime",
+}); // One-time purchase
+
 // Android uses "premium_monthly:monthly" while iOS uses "premium_monthly"
 const PRODUCT_ID_MONTHLY = Platform.select({
   android: "premium_monthly:monthly",
-  ios: "premium_monthly",
+  ios: "monthly_premium",
   default: "premium_monthly",
 });
-const ENTITLEMENT_ID = "premium";
 
 export class PaymentService {
   private static isInitialized = false;
@@ -267,24 +271,28 @@ export class PaymentService {
   }
 
   /**
-   * Check if customer has premium access
-   */
+     * Check if customer has premium access
+     * Updated to match your specific RevenueCat Entitlement IDs
+     */
   private static hasPremiumAccess(customerInfo: CustomerInfo): boolean {
-    // Check entitlement (most reliable)
-    const hasEntitlement =
-      customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+    // 1. Check the specific Entitlement IDs from your RevenueCat Dashboard
+    const hasMonthlyEntitlement =
+      customerInfo.entitlements.active["premium_monthly"] !== undefined;
 
-    // Check lifetime purchase
-    const hasLifetime =
+    const hasLifetimeEntitlement =
+      customerInfo.entitlements.active["premium_lifetime"] !== undefined;
+
+    // 2. Check the raw Product IDs (as a backup)
+    const hasLifetimeProduct =
       customerInfo.allPurchaseDates?.[PRODUCT_ID_LIFETIME] !== undefined ||
       customerInfo.nonSubscriptionTransactions?.some(
         (t) => t.productIdentifier === PRODUCT_ID_LIFETIME
       );
 
-    // Check monthly subscription
-    const hasMonthly =
+    const hasMonthlyProduct =
       customerInfo.activeSubscriptions.includes(PRODUCT_ID_MONTHLY);
 
-    return hasEntitlement || hasLifetime || hasMonthly;
+    // Return true if ANY of these are true
+    return hasMonthlyEntitlement || hasLifetimeEntitlement || hasLifetimeProduct || hasMonthlyProduct;
   }
 }

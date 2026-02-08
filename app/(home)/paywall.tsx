@@ -286,7 +286,7 @@ export default function PaywallScreen() {
               Upgrade to Premium
             </Text>
             <Text variant="caption" color="textSubdued" marginBottom="m">
-              Unlock unlimited AI analysis and support future development
+            Unlock unlimited AI analysis and premium features
             </Text>
 
             {isPremium && (
