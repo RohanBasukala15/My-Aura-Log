@@ -228,7 +228,6 @@ export default function PaywallScreen() {
   }, [referralCodeInput, loadPremiumStatus, loadReferralData]);
 
   const renderOfferMeta = (pkg: PurchasesPackage | null) => {
-    console.log("pkg", JSON.stringify(pkg, null, 2));
     if (!pkg) {
       return null;
     }
@@ -264,8 +263,7 @@ export default function PaywallScreen() {
       return null;
     }
 
-    console.log("hasFreeTrial", JSON.stringify(pkg, null, 2));
-    
+
     return (
       <Box marginTop="xs" alignItems="center" gap="xs">
         {hasFreeTrial && trialDuration && (
@@ -314,7 +312,7 @@ export default function PaywallScreen() {
               Upgrade to Premium
             </Text>
             <Text variant="caption" color="textSubdued" marginBottom="m">
-            Unlock unlimited AI analysis and premium features
+              Unlock unlimited AI analysis and premium features
             </Text>
 
             {isPremium && (
