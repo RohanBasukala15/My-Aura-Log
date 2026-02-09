@@ -84,7 +84,7 @@ module.exports = ({ config }) => {
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
-      versionCode: 10,
+      versionCode: 11,
       permissions: ["android.permission.CAMERA"],
       privacy: {
         privacyPolicy: "https://rohanbasukala15.github.io/My-Aura-Log/privacy-policy.html",
@@ -140,6 +140,7 @@ module.exports = ({ config }) => {
       ],
       withNotificationColorOverride,
       "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
     ],
     updates: {
       fallbackToCacheTimeout: 1200,

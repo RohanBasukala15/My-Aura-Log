@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
 import { BackHandler } from "react-native";
 import * as Notifications from "expo-notifications";
+import { getCrashlytics } from "@react-native-firebase/crashlytics";
 import { PaymentService } from "@common/services/paymentService";
 
 import {
@@ -61,6 +62,15 @@ export default function Root() {
   // Initialize RevenueCat payment service
   useEffect(() => {
     PaymentService.initialize()
+  }, []);
+
+  // Initialize Crashlytics so global JS error / unhandled rejection handlers are registered (reports show in Firebase Console)
+  useEffect(() => {
+    try {
+      getCrashlytics();
+    } catch (_) {
+      // Firebase may not be available in some environments
+    }
   }, []);
 
   // disabled android gesture

@@ -228,27 +228,55 @@ export default function PaywallScreen() {
   }, [referralCodeInput, loadPremiumStatus, loadReferralData]);
 
   const renderOfferMeta = (pkg: PurchasesPackage | null) => {
+    console.log("pkg", JSON.stringify(pkg, null, 2));
     if (!pkg) {
       return null;
     }
 
-    const hasIntroPrice = !!pkg.product.introPrice;
-    const discountCount = pkg.product.discounts?.length || 0;
+    const product = pkg.product as unknown as Record<string, unknown>;
+    const introPrice = product?.introPrice as { price?: number; priceString?: string; periodUnit?: string; periodNumberOfUnits?: number; period?: string } | null | undefined;
+    const defaultOption = product?.defaultOption as { freePhase?: { billingPeriod?: { value?: number; unit?: string }; offerPaymentMode?: string } } | null | undefined;
+    const discountCount = (product?.discounts as unknown[] | null | undefined)?.length || 0;
 
-    if (!hasIntroPrice && discountCount === 0) {
+    // Detect free trial: introPrice (price=0 + period) or defaultOption.freePhase
+    const hasFreeTrial =
+      (introPrice && introPrice.price === 0 && (introPrice.periodNumberOfUnits ?? introPrice.period)) ||
+      (defaultOption?.freePhase && defaultOption.freePhase.offerPaymentMode === "FREE_TRIAL");
+
+    const trialDuration = (() => {
+      const bp = defaultOption?.freePhase?.billingPeriod;
+      if (bp?.value != null && bp?.unit) {
+        const unit = String(bp.unit).toLowerCase();
+        return `${bp.value}-${unit === "day" ? "day" : unit === "week" ? "week" : unit === "month" ? "month" : unit}`;
+      }
+      if (introPrice?.periodNumberOfUnits != null && introPrice?.periodUnit) {
+        const u = String(introPrice.periodUnit).toLowerCase();
+        return `${introPrice.periodNumberOfUnits}-${u === "day" ? "day" : u === "week" ? "week" : u === "month" ? "month" : u}`;
+      }
+      if (introPrice?.period === "P2W") return "14-day";
+      if (introPrice?.period === "P1W") return "7-day";
+      return null;
+    })();
+
+    const priceString = (product?.priceString as string) ?? "";
+
+    if (!hasFreeTrial && discountCount === 0) {
       return null;
     }
 
+    console.log("hasFreeTrial", JSON.stringify(pkg, null, 2));
+    
     return (
       <Box marginTop="xs" alignItems="center" gap="xs">
-        {hasIntroPrice && (
+        {hasFreeTrial && trialDuration && (
           <Box style={styles.metaPill}>
             <Text variant="caption" style={styles.metaText}>
-              Intro offer: {pkg.product.introPrice?.priceString}
+              {trialDuration} free trial
+              {priceString ? ` • then ${priceString}/mo` : ""}
             </Text>
           </Box>
         )}
-        {discountCount > 0 && (
+        {discountCount > 0 && !hasFreeTrial && (
           <Box style={styles.metaPill}>
             <Text variant="caption" style={styles.metaText}>
               {discountCount} discount{discountCount === 1 ? "" : "s"} available
