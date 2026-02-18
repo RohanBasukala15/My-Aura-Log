@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { FlatList, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Calendar } from "react-native-calendars";
@@ -8,13 +8,22 @@ import moment from "moment";
 import { Box, Text, useTheme } from "@common/components/theme";
 import { JournalEntry } from "@common/models/JournalEntry";
 import { JournalStorage } from "@common/services/journalStorage";
+import { OpenAIService } from "@common/services/openaiService";
 import Toast from "react-native-toast-message";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+type MotivationalQuote = { quote: string; author?: string } | null;
 
 function CalendarScreen() {
   const theme = useTheme();
   const router = useRouter();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(moment().format("YYYY-MM-DD"));
+  const [motivationalQuote, setMotivationalQuote] = useState<MotivationalQuote>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+
+  const insets = useSafeAreaInsets(); 
 
   const loadEntries = async () => {
     try {
@@ -30,7 +39,12 @@ function CalendarScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setIsFocused(true);
       loadEntries();
+      return () => {
+        setIsFocused(false);
+        setMotivationalQuote(null);
+      };
     }, [])
   );
 
@@ -83,6 +97,15 @@ function CalendarScreen() {
       .filter(entry => moment(entry.timestamp).format("YYYY-MM-DD") === selectedDate)
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [entries, selectedDate]);
+
+  const isEmptyState = entries.length === 0 || selectedDateEntries.length === 0;
+  useEffect(() => {
+    if (!isFocused || !isEmptyState || motivationalQuote !== null || quoteLoading) return;
+    setQuoteLoading(true);
+    OpenAIService.generateJournalingMotivationalQuote()
+      .then(setMotivationalQuote)
+      .finally(() => setQuoteLoading(false));
+  }, [isFocused, isEmptyState, motivationalQuote, quoteLoading]);
 
   const handleDayPress = useCallback((day: { dateString: string }) => {
     setSelectedDate(day.dateString);
@@ -252,9 +275,10 @@ function CalendarScreen() {
     <Box flex={1} backgroundColor="backgroundDefault">
       <StatusBar style="dark" />
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}>
-        <Box paddingHorizontal="m" paddingTop="xxxl" paddingBottom="m">
+        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top }]}
+        showsVerticalScrollIndicator={false}
+        >
+        <Box paddingHorizontal="m"  >
           <Text variant="h2-pacifico" color="textDefault" textAlign="center" marginBottom="s">
             Your Journal Calendar
           </Text>
@@ -317,9 +341,26 @@ function CalendarScreen() {
               <Text variant="h3" marginBottom="xxs" color="textSubdued">
                 No entries on this day
               </Text>
-              <Text variant="default" color="textSubdued" textAlign="center">
-                Start journaling to see your entries here
-              </Text>
+              {quoteLoading ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 8 }} />
+              ) : motivationalQuote ? (
+                <Box alignItems="center" marginVertical="s">
+                  <Text variant="default" color="textDefault" textAlign="center" marginBottom="xs" style={{ fontStyle: "italic" }}>
+                    {"\u201C"}
+                    {motivationalQuote.quote}
+                    {"\u201D"}
+                  </Text>
+                  {motivationalQuote.author && (
+                    <Text variant="caption" color="textSubdued" textAlign="center">
+                      — {motivationalQuote.author}
+                    </Text>
+                  )}
+                </Box>
+              ) : (
+                <Text variant="default" color="textSubdued" textAlign="center">
+                  Start journaling to see your entries here
+                </Text>
+              )}
             </Box>
           )}
         </Box>

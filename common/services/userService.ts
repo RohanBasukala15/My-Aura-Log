@@ -9,6 +9,8 @@ type UserDocument = {
     motivationNotificationsEnabled?: boolean;
     fcmToken?: string | null;
     timezone?: string;
+    notificationTime?: string; // "HH:mm" user's preferred daily reminder time
+    isPremium?: boolean;
 };
 
 async function getUserDocRef() {
@@ -18,6 +20,15 @@ async function getUserDocRef() {
 
     const deviceId = await getDeviceId();
     return { ref: doc(db, USERS_COLLECTION, deviceId), deviceId } as const;
+}
+
+/** Build payload for Firestore; undefined values are not allowed and are omitted. */
+function sanitizeForFirestore(data: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+        if (v !== undefined) out[k] = v;
+    }
+    return out;
 }
 
 async function mergeUserData(data: Record<string, unknown>) {
@@ -30,7 +41,7 @@ async function mergeUserData(data: Record<string, unknown>) {
     await setDoc(
         ref,
         {
-            ...data,
+            ...sanitizeForFirestore(data),
             updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -61,15 +72,52 @@ export const UserService = {
         };
     },
 
-    async updateMotivationNotifications(options: { enabled: boolean; fcmToken?: string | null; timezone?: string }) {
+    /**
+     * Sync notification preferences and optional premium status to Firestore.
+     * Used by the backend to send daily push (with motivational quote for premium) when the app is closed.
+     * @returns true if Firestore was updated, false if Firebase not configured
+     */
+    async updateMotivationNotifications(options: {
+        enabled: boolean;
+        fcmToken?: string | null;
+        timezone?: string;
+        notificationTime?: string;
+        isPremium?: boolean;
+    }): Promise<boolean> {
+        const userRefData = await getUserDocRef();
+        if (!userRefData) return false;
         await mergeUserData({
             motivationNotificationsEnabled: options.enabled,
             fcmToken: options.fcmToken ?? null,
-            timezone: options.timezone,
+            ...(options.timezone != null && options.timezone !== "" && { timezone: options.timezone }),
+            ...(options.notificationTime != null && { notificationTime: options.notificationTime }),
+            ...(options.isPremium != null && { isPremium: options.isPremium }),
         });
+        return true;
+    },
+
+    /** Sync only premium status to Firestore (e.g. after purchase or app load). */
+    async syncPremiumStatus(isPremium: boolean): Promise<boolean> {
+        const userRefData = await getUserDocRef();
+        if (!userRefData) return false;
+        await mergeUserData({ isPremium });
+        return true;
     },
 
     async saveFcmToken(token: string | null) {
         await mergeUserData({ fcmToken: token ?? null });
+    },
+
+    /**
+     * Check if we have an FCM token (for debugging / UI). Reads from Firestore.
+     * For local Storage only, use Storage.getItem(AppConstants.StorageKey.fcmToken).
+     */
+    async getFcmTokenStatus(): Promise<{ hasToken: boolean; tokenSuffix?: string }> {
+        const docData = await fetchUserDocument();
+        const token = docData?.fcmToken ?? null;
+        if (!token || typeof token !== "string") {
+            return { hasToken: false };
+        }
+        return { hasToken: true, tokenSuffix: token.slice(-8) };
     },
 };

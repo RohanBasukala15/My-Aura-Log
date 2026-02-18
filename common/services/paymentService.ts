@@ -47,6 +47,7 @@ export class PaymentService {
     }
 
     try {
+      await Purchases.setLogLevel(Purchases.LOG_LEVEL.ERROR);
       await Purchases.configure({ apiKey });
       this.isInitialized = true;
       return true;

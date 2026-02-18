@@ -1,3 +1,8 @@
+// Silence React Native Firebase v22 modular deprecation warnings (we use modular API; some internals still trigger warnings)
+if (typeof globalThis !== "undefined") {
+  (globalThis as Record<string, unknown>).RNFB_SILENCE_MODULAR_DEPRECATION_WARNINGS = true;
+}
+
 import React, { useEffect } from "react";
 import { SplashScreen, Stack } from "expo-router";
 import { Provider } from "react-redux";
@@ -6,7 +11,10 @@ import Toast from "react-native-toast-message";
 import { BackHandler } from "react-native";
 import * as Notifications from "expo-notifications";
 import { getCrashlytics } from "@react-native-firebase/crashlytics";
+import { NotificationProvider } from "@common/services/notification/NotificationProvider";
 import { PaymentService } from "@common/services/paymentService";
+import { PremiumService } from "@common/services/premiumService";
+import { UserService } from "@common/services/userService";
 
 import {
   AppConfiguration,
@@ -46,6 +54,7 @@ function ConfigurationState() {
   // TODO: observe cache state and update status with ready status;
   useEffect(() => {
     dispatch(loadConfiguration());
+    PremiumService.isPremium().then((isPremium) => UserService.syncPremiumStatus(isPremium)).catch(() => { /* ignore */ });
     setTimeout(() => {
       //TODO: Call this once app configuration loaded (also check if league has be selected)
       appConfig.updateState({
@@ -90,6 +99,7 @@ export default function Root() {
           }}>
           <Provider store={store}>
             <ConfigurationState />
+            <NotificationProvider />
             <AppConfiguration assets={[]}>
               <NavigatorLayout />
               <Toast position="bottom" bottomOffset={40} config={toastConfig} />

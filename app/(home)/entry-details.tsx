@@ -18,6 +18,7 @@ import { Text } from "@common/components/theme";
 import { JournalEntry, AIInsight } from "@common/models/JournalEntry";
 import { JournalStorage } from "@common/services/journalStorage";
 import { OpenAIService } from "@common/services/openaiService";
+import { trackUpgradeClick } from "@common/services/analyticsService";
 import { PremiumService } from "@common/services/premiumService";
 import { MoodAnalysisService } from "@common/services/moodAnalysisService";
 import { BreathingRecommendation } from "@common/models/BreathingSession";
@@ -142,22 +143,9 @@ function EntryDetails() {
   const [healthExpanded, setHealthExpanded] = useState(false);
   const [hobbiesExpanded, setHobbiesExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [remainingAI, setRemainingAI] = useState<number>(-1);
-  const [isPremium, setIsPremium] = useState(false);
-  const [breathingRecommendation, setBreathingRecommendation] = useState<BreathingRecommendation | null>(null);
 
-  useEffect(() => {
-    loadPremiumStatus();
-  }, []);
 
-  const loadPremiumStatus = useCallback(async () => {
-    const [premium, remaining] = await Promise.all([
-      PremiumService.isPremium(),
-      PremiumService.getRemainingAIUsage(),
-    ]);
-    setIsPremium(premium);
-    setRemainingAI(remaining);
-  }, []);
+
 
   const navigateToBreathing = useCallback(
     (recommendation: BreathingRecommendation) => {
@@ -191,7 +179,8 @@ function EntryDetails() {
             style: "default",
             onPress: () => {
               resolve(true);
-              router.push("/(home)/(tabs)/settings");
+              trackUpgradeClick("entry_details");
+              router.push({ pathname: "/(home)/paywall", params: { source: "entry_details" } });
             },
           },
         ],
@@ -243,7 +232,6 @@ function EntryDetails() {
         const context = buildAIContext();
         const insight = await OpenAIService.generateInsight(journalText, selectedMood, context);
         await PremiumService.incrementAIUsage();
-        await loadPremiumStatus();
         return insight;
       } catch (error) {
         Toast.show({
@@ -254,7 +242,7 @@ function EntryDetails() {
         return undefined;
       }
     },
-    [journalText, selectedMood, buildAIContext, loadPremiumStatus]
+    [journalText, selectedMood, buildAIContext]
   );
 
   const showBreathingAlert = useCallback(
@@ -347,7 +335,6 @@ function EntryDetails() {
       await JournalStorage.saveEntry(entry);
 
       const recommendation = MoodAnalysisService.analyzeEntry(entry);
-      setBreathingRecommendation(recommendation);
 
       // Clear Redux draft
       dispatch(resetDraft());

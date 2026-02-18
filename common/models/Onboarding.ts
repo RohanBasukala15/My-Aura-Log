@@ -28,7 +28,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     type: "welcome",
     title: "Welcome To My Aura Log",
     subtitle: "Your energy. Your story.",
-    description: "Check in with yourself, log your daily aura, and discover patterns that matter to you.",
+    description: "Check in with yourself, log your daily aura, get AI-powered reflections on your entries, and discover patterns that matter to you.",
     primaryButton: "Begin your journey",
   },
   {

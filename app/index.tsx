@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Redirect, usePathname } from "expo-router";
+import { Redirect } from "expo-router";
 
 import { ActivityIndicator, Box, useAppConfiguration } from "@common/components";
 import { useAppSelector } from "@common/redux";
@@ -16,20 +16,18 @@ export default function EntryPoint() {
   const { isOnboardingCompleted, isBiometricSetupRequired } = useAppSelector(
     (state) => state.appConfiguration
   );
-  const pathname = usePathname();
 
-  // Track screen view
+  // Track screen view: use explicit names so Firebase never gets "/" (shown as "(not set)")
   useEffect(() => {
-    if (isReady && isUIReady) {
-      if (!isOnboardingCompleted) {
-        trackScreenView(pathname || 'onboarding');
-      } else if (isBiometricSetupRequired) {
-        trackScreenView(pathname || 'login_with_biometric');
-      } else {
-        trackScreenView(pathname || 'entry_point');
-      }
+    if (!isReady || !isUIReady) return;
+    if (!isOnboardingCompleted) {
+      trackScreenView('onboarding');
+    } else if (isBiometricSetupRequired) {
+      trackScreenView('login_with_biometric');
+    } else {
+      trackScreenView('entry_point');
     }
-  }, [isReady, isUIReady, isOnboardingCompleted, isBiometricSetupRequired, pathname]);
+  }, [isReady, isUIReady, isOnboardingCompleted, isBiometricSetupRequired]);
 
   if (!isReady || !isUIReady) {
     return <LoadingScreen />;

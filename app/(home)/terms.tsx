@@ -20,7 +20,7 @@ function Terms() {
         {/* Header */}
         <Box flexDirection="row" alignItems="center" marginBottom="xl">
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={theme.colors.textDefault} />
+            <MatguierialCommunityIcons name="arrow-left" size={24} color={theme.colors.textDefault} />
           </TouchableOpacity>
           <Text variant="h3" color="textDefault" style={{ flex: 1, marginLeft: 8 }}>
             Terms & Conditions

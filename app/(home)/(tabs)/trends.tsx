@@ -4,18 +4,25 @@ import {
   StyleSheet,
   Dimensions,
   TouchableOpacity,
+  Pressable,
   Share,
   ActivityIndicator,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect, useRouter } from "expo-router";
 import { LineChart } from "react-native-chart-kit";
 import { LinearGradient } from "expo-linear-gradient";
 import moment from "moment";
 
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { Box, Text, useTheme } from "@common/components/theme";
 import { JournalEntry, MOOD_LABELS, MOOD_VALUES } from "@common/models/JournalEntry";
 import { JournalStorage } from "@common/services/journalStorage";
+import { OpenAIService } from "@common/services/openaiService";
+import { trackUpgradeClick } from "@common/services/analyticsService";
 import { PremiumService } from "@common/services/premiumService";
 import {
   getWeekDays,
@@ -25,6 +32,8 @@ import {
   getWeekId,
   type WeekDay,
 } from "@common/utils/weekUtils";
+import { pickRandom } from "@common/utils/randomUtils";
+import { FUTURE_TOASTS } from "@common/constants/futureToasts";
 import { generateDailyPulse, type DailyPulse } from "@common/services/dailyPulseService";
 import { ensureWeeklySummary } from "@common/services/weeklySummaryService";
 import type { WeeklySummary } from "@common/services/weeklySummaryStorage";
@@ -45,6 +54,7 @@ function formatYLabel(value: string): string {
 function Trends() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [weekOffset, setWeekOffset] = useState(0);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [weekEntries, setWeekEntries] = useState<JournalEntry[]>([]);
@@ -53,6 +63,9 @@ function Trends() {
   const [dailyPulse, setDailyPulse] = useState<DailyPulse | null>(null);
   const [loadingDailyPulse, setLoadingDailyPulse] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [motivationalQuote, setMotivationalQuote] = useState<{ quote: string; author?: string } | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const today = useMemo(() => moment(), []);
   const weekMoment = useMemo(() => getWeekMomentForOffset(weekOffset), [weekOffset]);
@@ -83,9 +96,22 @@ function Trends() {
 
   useFocusEffect(
     useCallback(() => {
+      setIsFocused(true);
       loadEntries();
+      return () => {
+        setIsFocused(false);
+        setMotivationalQuote(null);
+      };
     }, [loadEntries])
   );
+
+  useEffect(() => {
+    if (!isFocused || entries.length > 0 || motivationalQuote !== null || quoteLoading) return;
+    setQuoteLoading(true);
+    OpenAIService.generateJournalingMotivationalQuote()
+      .then(setMotivationalQuote)
+      .finally(() => setQuoteLoading(false));
+  }, [isFocused, entries.length, motivationalQuote, quoteLoading]);
 
   useEffect(() => {
     loadEntries();
@@ -176,7 +202,8 @@ function Trends() {
   );
 
   const onUnlockPress = useCallback(() => {
-    router.push("/(home)/(tabs)/settings");
+    trackUpgradeClick("trends");
+    router.push({ pathname: "/(home)/paywall", params: { source: "trends" } });
   }, [router]);
 
   const onShareAura = useCallback(async () => {
@@ -210,16 +237,36 @@ function Trends() {
   if (entries.length === 0) {
     return (
       <ScrollView
-        contentContainerStyle={[styles.container, { backgroundColor: theme.colors.backgroundDefault }]}
+        contentContainerStyle={[
+          styles.container,
+          { backgroundColor: theme.colors.backgroundDefault, paddingTop: insets.top },
+        ]}
       >
         <StatusBar style="dark" />
         <Box padding="l" alignItems="center" justifyContent="center" flex={1} minHeight={400}>
           <Text variant="h3" marginBottom="m" color="textSubdued">
             No data yet
           </Text>
-          <Text variant="default" color="textSubdued" textAlign="center">
-            Start journaling to see your mood trends
-          </Text>
+          {quoteLoading ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 8 }} />
+          ) : motivationalQuote ? (
+            <Box alignItems="center">
+              <Text variant="default" color="textDefault" textAlign="center" marginBottom="xs" style={{ fontStyle: "italic" }}>
+                {"\u201C"}
+                {motivationalQuote.quote}
+                {"\u201D"}
+              </Text>
+              {motivationalQuote.author && (
+                <Text variant="caption" color="textSubdued" textAlign="center">
+                  — {motivationalQuote.author}
+                </Text>
+              )}
+            </Box>
+          ) : (
+            <Text variant="default" color="textSubdued" textAlign="center">
+              Start journaling to see your mood trends
+            </Text>
+          )}
         </Box>
       </ScrollView>
     );
@@ -227,30 +274,54 @@ function Trends() {
 
   return (
     <ScrollView
-      contentContainerStyle={[styles.container, { backgroundColor: theme.colors.backgroundDefault }]}
+      contentContainerStyle={[
+        styles.container,
+        { backgroundColor: theme.colors.backgroundDefault, paddingTop: insets.top },
+      ]}
     >
       <StatusBar style="dark" />
-
       {/* Week navigator */}
-      <Box flexDirection="row" alignItems="center" justifyContent="space-between" paddingHorizontal="m" paddingTop="xxxl" marginBottom="s">
-        <TouchableOpacity
-          onPress={() => setWeekOffset((o) => o - 1)}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      <Box flexDirection="row" alignItems="center" justifyContent="space-between" paddingHorizontal="m" marginBottom="s">
+        <Pressable
+          onPress={() => setWeekOffset((offset) => offset - 1)}
           style={styles.arrowHit}
         >
-          <Text variant="h3" color="primary">‹</Text>
-        </TouchableOpacity>
+          {({ pressed }) => (
+            <MaterialCommunityIcons
+              name="arrow-left"
+              size={34}
+              color={pressed ? theme.colors.primary : theme.colors.iconsBackground}
+            />
+          )}
+        </Pressable>
         <Text variant="h5" color="textDefault" numberOfLines={1}>
           {formatWeekRange(weekMoment)}
         </Text>
-        <TouchableOpacity
-          onPress={() => canGoNext && setWeekOffset((o) => o + 1)}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        <Pressable
+          onPress={() => {
+            if (weekOffset >= 0) {
+              const toast = pickRandom(FUTURE_TOASTS);
+              if (toast) {
+                Toast.show({
+                  type: "success",
+                  text1: toast.title,
+                  text2: toast.message,
+                });
+              }
+              return;
+            }
+            setWeekOffset((offset) => offset + 1);
+          }}
           style={styles.arrowHit}
-          disabled={!canGoNext}
         >
-          <Text variant="h3" color={canGoNext ? "primary" : "textDisabled"}>›</Text>
-        </TouchableOpacity>
+          {({ pressed }) => (
+            <MaterialCommunityIcons
+              name="arrow-right"
+              size={34}
+              color={pressed ? theme.colors.primary : theme.colors.iconsBackground}
+            />
+          )}
+        </Pressable>
       </Box>
 
       <Text variant="default" marginBottom="m" color="textSubdued" textAlign="center" paddingHorizontal="m">
@@ -260,7 +331,7 @@ function Trends() {
       </Text>
 
       {/* Oracle: Daily Pulse (Mon–Sat) or Weekly Reflection (Sun / past) */}
-      <Box paddingHorizontal="m" marginBottom="m">
+      <Box paddingHorizontal="m" marginTop="s" marginBottom="m">
         <OracleCard
           isWeekly={isSundayOrPast}
           isPremium={isPremium}
@@ -386,7 +457,7 @@ function OracleCard({
 
   return (
     <Box
-      borderRadius="l"
+      borderRadius="m"
       overflow="hidden"
       style={{
         shadowColor: "#000",
@@ -411,6 +482,9 @@ function OracleCard({
               <>
                 <Text variant="default" color="textSubdued">
                   Unlock Premium to see your Weekly Reflection.
+                </Text>
+                <Text variant="caption" color="textSubdued" marginTop="xs">
+                  Weekly Reflection and Your Aura Today are part of Premium.
                 </Text>
                 {unlockCta}
               </>
@@ -459,6 +533,9 @@ function OracleCard({
               <>
                 <Text variant="default" color="textSubdued">
                   Unlock Premium to see Your Aura Today.
+                </Text>
+                <Text variant="caption" color="textSubdued" marginTop="xs">
+                  Weekly Reflection and Your Aura Today are part of Premium.
                 </Text>
                 {unlockCta}
               </>
@@ -558,19 +635,6 @@ function MoodMixBlock({
 const styles = StyleSheet.create({
   container: { flexGrow: 1 },
   arrowHit: { padding: 8 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalBox: {
-    borderRadius: 16,
-    padding: 20,
-    maxWidth: 320,
-    width: "100%",
-  },
 });
 
 export default Trends;

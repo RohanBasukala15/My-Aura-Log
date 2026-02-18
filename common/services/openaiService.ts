@@ -124,7 +124,13 @@ Return JSON:
      */
     static async generateMotivationalQuote(): Promise<string> {
         const openai = getOpenAIClient();
-        if (!openai) return "";
+        if (!openai) {
+            if (__DEV__) {
+                // eslint-disable-next-line no-console
+                console.warn("[OpenAI] Motivational quote skipped: EXPO_PUBLIC_OPENAI_API_KEY is not set (check .env and EAS secrets for production builds).");
+            }
+            return "";
+        }
 
         try {
             const response = await openai.chat.completions.create({
@@ -142,8 +148,65 @@ Return JSON:
             });
             const text = response.choices[0]?.message?.content?.trim() || "";
             return text;
-        } catch {
+        } catch (err) {
+            if (__DEV__) {
+                // eslint-disable-next-line no-console
+                console.warn("[OpenAI] Motivational quote failed:", err instanceof Error ? err.message : err);
+            }
             return "";
+        }
+    }
+
+    /**
+     * Generate a motivational quote about journaling, mental health, or mindfulness
+     * for empty-state screens (e.g. history). Returns quote and optional author.
+     */
+    static async generateJournalingMotivationalQuote(): Promise<{ quote: string; author?: string }> {
+        const openai = getOpenAIClient();
+        if (!openai) {
+            return {
+                quote: "Writing your thoughts is one of the kindest things you can do for your mind.",
+                author: "My Aura Log",
+            };
+        }
+
+        try {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content:
+                            "You respond with valid JSON only. No markdown, no code blocks. Format: {\"quote\": \"the quote text\", \"author\": \"Author Name\"}. The quote must be about journaling, mental health, mindfulness, self-reflection, or writing for wellbeing. Use a real or plausible attributed author when it fits (e.g. famous writers, thinkers, psychologists). Keep quote under 25 words, warm and motivating.",
+                    },
+                    {
+                        role: "user",
+                        content:
+                            "Give one short, captivating motivational quote about journaling or mental wellness, with an author. Return only the JSON object.",
+                    },
+                ],
+                temperature: 0.8,
+                max_tokens: 120,
+            });
+            const raw = response.choices[0]?.message?.content?.trim() || "";
+            const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+            const parsed = JSON.parse(cleaned) as { quote?: string; author?: string };
+            const quote = typeof parsed?.quote === "string" && parsed.quote.length > 0
+                ? parsed.quote
+                : "Writing your thoughts is one of the kindest things you can do for your mind.";
+            const author = typeof parsed?.author === "string" && parsed.author.length > 0
+                ? parsed.author
+                : undefined;
+            return { quote, author };
+        } catch (err) {
+            if (__DEV__) {
+                // eslint-disable-next-line no-console
+                console.warn("[OpenAI] Journaling quote failed:", err instanceof Error ? err.message : err);
+            }
+            return {
+                quote: "Start journaling to see your entries here—and give your mind a little room to breathe.",
+                author: "My Aura Log",
+            };
         }
     }
 }

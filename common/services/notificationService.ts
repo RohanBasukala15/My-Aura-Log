@@ -1,3 +1,14 @@
+/**
+ * Local notifications (expo-notifications): on-device scheduling only.
+ *
+ * Daily reminder when the app is closed is sent by the Firebase Cloud Function
+ * via FCM (see NotificationProvider for token, Firestore for prefs, functions/ for cron).
+ * We do not schedule a local daily here when "motivation notifications" are on,
+ * so the user gets one daily ping from the server (no duplicate).
+ *
+ * This service is used for: weekly summary (local), and scheduleDailyNotification
+ * is kept for optional/local-only use (e.g. fallback or future features).
+ */
 import * as Notifications from "expo-notifications";
 import { Storage } from "./Storage";
 import { PremiumService } from "./premiumService";

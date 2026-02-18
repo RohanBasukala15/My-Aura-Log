@@ -1,5 +1,9 @@
 import { isFirebaseConfigured } from './firebase';
-import analytics from '@react-native-firebase/analytics';
+import { getAnalytics, logEvent } from '@react-native-firebase/analytics';
+
+function getAnalyticsInstance() {
+  return getAnalytics();
+}
 
 export const trackEvent = (eventName: string, params?: Record<string, any>) => {
   if (!isFirebaseConfigured) {
@@ -10,7 +14,7 @@ export const trackEvent = (eventName: string, params?: Record<string, any>) => {
   }
 
   try {
-    analytics().logEvent(eventName, params);
+    logEvent(getAnalyticsInstance(), eventName, params ?? {});
   } catch (error) {
     if (__DEV__) {
       console.warn('Analytics logEvent failed:', error);
@@ -18,22 +22,32 @@ export const trackEvent = (eventName: string, params?: Record<string, any>) => {
   }
 };
 
+/** Fallback when screen name is empty or "/" (Firebase shows these as "(not set)") */
+const SANITIZE_SCREEN_NAME = (name: string): string => {
+  const trimmed = (name || '').trim();
+  if (trimmed === '' || trimmed === '/') return 'app';
+  return trimmed;
+};
+
 export const trackScreenView = (screenName: string, screenClass?: string) => {
+  const name = SANITIZE_SCREEN_NAME(screenName);
+  const screenClassSafe = screenClass ? SANITIZE_SCREEN_NAME(screenClass) : name;
+
   if (!isFirebaseConfigured) {
     if (__DEV__) {
-      console.log('[Analytics Screen]', screenName);
+      console.log('[Analytics Screen]', name);
     }
     return;
   }
 
   try {
-    analytics().logScreenView({
-      screen_name: screenName,
-      screen_class: screenClass || screenName,
+    logEvent(getAnalyticsInstance(), 'screen_view', {
+      screen_name: name,
+      screen_class: screenClassSafe,
     });
   } catch (error) {
     if (__DEV__) {
-      console.warn('Analytics logScreenView failed:', error);
+      console.warn('Analytics screen_view failed:', error);
     }
   }
 };
@@ -82,4 +96,61 @@ export const trackTabNavigation = (tabName: string) => {
   trackEvent('tab_navigation', {
     tab_name: tabName,
   });
+};
+
+/**
+ * Track paywall screen view (with optional source)
+ */
+export const trackPaywallView = (source?: string) => {
+  trackEvent('paywall_view', source ? { source } : {});
+};
+
+/**
+ * Track upgrade CTA click (Unlock Premium, See What's Included)
+ */
+export const trackUpgradeClick = (location: string) => {
+  trackEvent('upgrade_click', { location });
+};
+
+/**
+ * Track purchase flow events
+ */
+export const trackPurchaseStart = (type: 'monthly' | 'lifetime') => {
+  trackEvent('purchase_start', { type });
+};
+
+export const trackPurchaseSuccess = (type: 'monthly' | 'lifetime') => {
+  trackEvent('purchase_success', { type });
+};
+
+export const trackPurchaseCancel = (type: 'monthly' | 'lifetime') => {
+  trackEvent('purchase_cancel', { type });
+};
+
+/**
+ * Track referral invite share
+ */
+export const trackReferralInviteShare = () => {
+  trackEvent('referral_invite_share', {});
+};
+
+/**
+ * Track onboarding completion
+ */
+export const trackOnboardingComplete = () => {
+  trackEvent('onboarding_complete', {});
+};
+
+/**
+ * Track first journal entry saved
+ */
+export const trackFirstEntrySaved = () => {
+  trackEvent('first_entry_saved', {});
+};
+
+/**
+ * Track AI insight generated
+ */
+export const trackAIInsightGenerated = () => {
+  trackEvent('ai_insight_generated', {});
 };

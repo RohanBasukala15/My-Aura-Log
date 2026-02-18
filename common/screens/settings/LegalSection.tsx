@@ -46,7 +46,7 @@ export function LegalSection({ appVersion = "1.0.0" }: LegalSectionProps) {
                     My Aura Log v{appVersion}
                 </Text>
                 <Text variant="caption" color="textSubdued" textAlign="center" marginTop="xs">
-                    Your aura, brewed with ☕💜
+                    Made with 💜 & ☕ 
                 </Text>
             </Box>
         </Box>

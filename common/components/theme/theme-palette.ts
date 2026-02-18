@@ -64,7 +64,7 @@ export const appLightPalette = {
   iconsOnPrimary: "rgba(255, 255, 255, 1)",
   iconsOnCritical: "rgba(255, 255, 255, 1)",
   iconsOnInteractive: "rgba(255, 255, 255, 1)",
-  iconsBackground: "rgba(163, 236, 255, 0.21)",
+  iconsBackground: "rgba(100, 100, 100, 0.96)",
 
   interactiveDefault: "#30B7DB",
   interactiveHovered: "rgba(0, 107, 229, 1)",

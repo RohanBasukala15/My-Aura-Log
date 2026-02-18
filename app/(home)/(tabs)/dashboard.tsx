@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   TextInput as RNTextInput,
   Alert,
+  Pressable,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { StatusBar } from "expo-status-bar";
@@ -18,6 +19,11 @@ import { JournalEntry, MoodEmoji, MOOD_EMOJIS, AIInsight } from "@common/models/
 import { JournalStorage } from "@common/services/journalStorage";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { OpenAIService } from "@common/services/openaiService";
+import {
+  trackUpgradeClick,
+  trackFirstEntrySaved,
+  trackAIInsightGenerated,
+} from "@common/services/analyticsService";
 import { PremiumService } from "@common/services/premiumService";
 import { PaymentService } from "@common/services/paymentService";
 import { Storage } from "@common/services/Storage";
@@ -37,7 +43,7 @@ import {
 } from "@common/redux/slices/entryDraft/entryDraft.slice";
 import { MoodAnalysisService } from "@common/services/moodAnalysisService";
 import { BreathingRecommendation } from "@common/models/BreathingSession";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 
 import dashboardCopy from "./HeaderTitleEntity.json";
 
@@ -181,17 +187,20 @@ interface CollapsibleSectionProps {
   children: React.ReactNode;
 }
 
-const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, expanded, onToggle, children }) => (
-  <Box marginBottom="m">
-    <TouchableOpacity onPress={onToggle} activeOpacity={0.7} style={styles.sectionHeader}>
-      <Text variant="h5" color="textDefault" style={styles.sectionTitle}>
-        {title} <Text style={styles.optionalText}>(optional)</Text>
-      </Text>
-      <Text style={styles.collapseIcon}>{expanded ? "˄" : "+"}</Text>
-    </TouchableOpacity>
-    {expanded && <Box marginTop="s">{children}</Box>}
-  </Box>
-);
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, expanded, onToggle, children }) => {
+  const theme = useTheme();
+  return (
+    <Box marginBottom="m">
+      <Pressable onPress={onToggle} style={styles.sectionHeader}>
+        <Text variant="h5" color="textDefault" style={styles.sectionTitle}>
+          {title} <Text style={styles.optionalText}>(optional)</Text>
+        </Text>
+        <MaterialCommunityIcons name={expanded ? "chevron-up" : "chevron-down"} size={28} color={theme.colors.iconsBackground} />
+      </Pressable>
+      {expanded && <Box marginTop="s">{children}</Box>}
+    </Box>
+  );
+};
 
 interface OptionButtonProps {
   id: string;
@@ -254,32 +263,42 @@ const NextOrSaveButton: React.FC<NextOrSaveButtonProps> = ({ isLoading, disabled
 interface AIUsageIndicatorProps {
   remainingAI: number;
   isPremium: boolean;
+  onUpgradePress?: () => void;
 }
 
-const AIUsageIndicator: React.FC<AIUsageIndicatorProps> = ({ remainingAI, isPremium }) => {
+const AIUsageIndicator: React.FC<AIUsageIndicatorProps> = ({ remainingAI, isPremium, onUpgradePress }) => {
   const theme = useTheme();
   if (isPremium || remainingAI < 0) return null;
 
+  const content = (
+    <Box
+      flexDirection="row"
+      flex={1}
+      paddingHorizontal="m"
+      paddingVertical="xs"
+      borderRadius="m"
+      style={{
+        backgroundColor: theme.colors.backgroundHovered,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+      }}>
+      <Text variant="h7" color="primary" textAlign="center">
+        {remainingAI > 0
+          ? `✨ ${remainingAI} AI analysis${remainingAI === 1 ? "" : "es"} remaining today`
+          : "✨ AI analyses used up today"}
+      </Text>
+    </Box>
+  );
+
   return (
     <Box marginTop="m" alignItems="flex-end" marginBottom="s">
-      <Box
-        flexDirection="row"
-        justifyContent="space-between"
-        flex={1}
-        paddingHorizontal="m"
-        paddingVertical="xs"
-        borderRadius="m"
-        style={{
-          backgroundColor: theme.colors.backgroundHovered,
-          borderWidth: 1,
-          borderColor: theme.colors.primary,
-        }}>
-        <Text variant="h7" color="primary" textAlign="center">
-          {remainingAI > 0
-            ? `✨ ${remainingAI} AI analysis${remainingAI === 1 ? "" : "es"} remaining today`
-            : "✨ AI analyses used up today"}
-        </Text>
-      </Box>
+      {remainingAI === 0 && onUpgradePress ? (
+        <TouchableOpacity onPress={onUpgradePress} activeOpacity={0.8} style={{ alignSelf: "stretch" }} >
+          {content}
+        </TouchableOpacity>
+      ) : (
+        content
+      )}
     </Box>
   );
 };
@@ -306,7 +325,6 @@ function Dashboard() {
   const [sleepExpanded, setSleepExpanded] = useState(false);
   const [healthExpanded, setHealthExpanded] = useState(false);
   const [hobbiesExpanded, setHobbiesExpanded] = useState(false);
-  const [quickNoteExpanded, setQuickNoteExpanded] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isLoading, setIsLoading] = useState(false);
@@ -354,7 +372,7 @@ function Dashboard() {
     if (PaymentService.isAvailable()) {
       await PaymentService.checkPremiumStatus();
     }
-    
+
     const [premium, remaining] = await Promise.all([PremiumService.isPremium(), PremiumService.getRemainingAIUsage()]);
     setIsPremium(premium);
     setRemainingAI(remaining);
@@ -368,7 +386,7 @@ function Dashboard() {
 
       const lifetimePkg = await PaymentService.getLifetimePackage();
       const monthlyPkg = await PaymentService.getMonthlyPackage();
-      
+
       if (lifetimePkg) {
         setLifetimePrice(lifetimePkg.product.priceString);
       }
@@ -513,7 +531,8 @@ function Dashboard() {
             style: "default",
             onPress: () => {
               resolve(true);
-              router.push("/(home)/(tabs)/settings");
+              trackUpgradeClick("dashboard_ai_limit");
+              router.push({ pathname: "/(home)/paywall", params: { source: "dashboard_ai_limit" } });
             },
           },
         ],
@@ -612,8 +631,12 @@ function Dashboard() {
 
     setIsLoading(true);
     try {
+      const existingCount = (await JournalStorage.getAllEntries()).length;
       const shouldAnalyze = await handleAICheck();
       const aiInsight = shouldAnalyze ? await generateAIInsight() : undefined;
+      if (shouldAnalyze && aiInsight) {
+        trackAIInsightGenerated();
+      }
 
       const entry: JournalEntry = {
         id: `entry_${Date.now()}`,
@@ -631,6 +654,9 @@ function Dashboard() {
       };
 
       await JournalStorage.saveEntry(entry);
+      if (existingCount === 0) {
+        trackFirstEntrySaved();
+      }
 
       const recommendation = MoodAnalysisService.analyzeEntry(entry);
       setBreathingRecommendation(recommendation);
@@ -638,10 +664,15 @@ function Dashboard() {
       // Clear Redux draft
       dispatch(resetDraft());
 
+      const isFirstEntry = existingCount === 0;
       Toast.show({
         type: "success",
-        text1: shouldAnalyze ? "Reflection saved with AI sparkle" : "Reflection saved",
-        text2: shouldAnalyze ? "Head to your entry for the full breakdown." : "Thanks for checking in today.",
+        text1: shouldAnalyze && aiInsight ? "Reflection saved with AI sparkle" : "Reflection saved",
+        text2: shouldAnalyze && aiInsight
+          ? "Head to your entry for the full breakdown."
+          : isFirstEntry
+            ? "Your next entries can include a free AI reflection (3 per day)."
+            : "Thanks for checking in today.",
       });
 
       if (recommendation.suggested) {
@@ -847,35 +878,19 @@ function Dashboard() {
             </Box>
           </CollapsibleSection>
 
-          {/* Quick Note Section */}
-          <CollapsibleSection
-            title="Additional Note"
-            expanded={quickNoteExpanded}
-            onToggle={() => setQuickNoteExpanded(!quickNoteExpanded)}>
-            <Box borderRadius="xl" style={styles.textInputContainer} overflow="hidden">
-              <LinearGradient
-                colors={["#FFFFFF", "#F8F6FF"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.textInputGradient}>
-                <RNTextInput
-                  placeholder="Add a quick note..."
-                  placeholderTextColor="#A7A7A7"
-                  value={quickNote}
-                  onChangeText={handleQuickNoteChange}
-                  multiline
-                  style={styles.textInput}
-                  textAlignVertical="top"
-                />
-              </LinearGradient>
-            </Box>
-          </CollapsibleSection>
 
           {/* Save Button */}
           <NextOrSaveButton isLoading={isLoading} disabled={!isFormValid || isLoading} onPress={handleSaveEntry} />
 
           {/* AI Usage Indicator */}
-          <AIUsageIndicator remainingAI={remainingAI} isPremium={isPremium} />
+          <AIUsageIndicator
+            remainingAI={remainingAI}
+            isPremium={isPremium}
+            onUpgradePress={() => {
+              trackUpgradeClick("dashboard_ai_usage_pill");
+              router.push({ pathname: "/(home)/paywall", params: { source: "dashboard_ai_limit" } });
+            }}
+          />
         </Box>
       </LinearGradient>
     </KeyboardAwareScrollView>

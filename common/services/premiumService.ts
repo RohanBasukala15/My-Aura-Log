@@ -1,8 +1,9 @@
 import { Storage } from "./Storage";
+import { UserService } from "./userService";
 
 const PREMIUM_STATUS_KEY = "myauralog_premium_status";
 const DAILY_AI_USAGE_KEY = "myauralog_daily_ai_usage";
-const FREE_AI_LIMIT_PER_DAY = 5;
+const FREE_AI_LIMIT_PER_DAY = 3;
 
 interface DailyUsage {
     date: string; // YYYY-MM-DD format
@@ -23,6 +24,7 @@ export class PremiumService {
      */
     static async setPremiumStatus(isPremium: boolean): Promise<void> {
         await Storage.setItem(PREMIUM_STATUS_KEY, isPremium);
+        await UserService.syncPremiumStatus(isPremium).catch(() => { });
     }
 
     /**
@@ -45,6 +47,7 @@ export class PremiumService {
             await Storage.setItem(DAILY_AI_USAGE_KEY, { date: today, count: 0 });
             return 0;
         }
+
 
         return usage?.count || 0;
     }

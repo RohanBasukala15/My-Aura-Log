@@ -12,8 +12,12 @@ import { Switch } from "@common/components/ui/Switch";
 import { ONBOARDING_STEPS, OnboardingStep } from "@common/models/Onboarding";
 import { useAppDispatch } from "@common/redux";
 import { setOnboardingComplete, setBiometricEnabled } from "@common/redux/slices/appConfiguration/app-configuration.slice";
+import AppConstants from "@common/assets/AppConstants";
+import { trackOnboardingComplete } from "@common/services/analyticsService";
 import { Storage } from "@common/services/Storage";
 import { NotificationService } from "@common/services/notificationService";
+import { PremiumService } from "@common/services/premiumService";
+import { UserService } from "@common/services/userService";
 import { GRADIENTS } from "@common/components/theme/gradients";
 import { Image } from "expo-image";
 import { useBiometricAvailability } from "@common/hooks/useBiometricAvailability";
@@ -62,16 +66,18 @@ export default function OnboardingScreen() {
       await Storage.setItem(NotificationService.NOTIFICATION_TIME_KEY, onboardingData.notification_time);
     }
 
-    // Schedule notification if enabled
+    // Sync to Firestore so Cloud Function (FCM) sends daily reminder at chosen time
     if (onboardingData.daily_notifications && onboardingData.notification_time) {
-      try {
-        await NotificationService.scheduleDailyNotification(
-          onboardingData.notification_time,
-          onboardingData.user_name || null
-        );
-      } catch (error) {
-        // Silently fail - user can enable in settings later
-      }
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+      const fcmToken = await Storage.getItem<string>(AppConstants.StorageKey.fcmToken, null);
+      const isPremium = await PremiumService.isPremium();
+      await UserService.updateMotivationNotifications({
+        enabled: true,
+        notificationTime: onboardingData.notification_time,
+        timezone,
+        fcmToken: fcmToken ?? undefined,
+        isPremium,
+      });
     }
 
     // Save biometric enabled state to Redux
@@ -79,6 +85,7 @@ export default function OnboardingScreen() {
       dispatch(setBiometricEnabled(onboardingData.biometric_enabled));
     }
     dispatch(setOnboardingComplete());
+    trackOnboardingComplete();
 
     router.replace("/(home)/(tabs)/dashboard");
   }, [onboardingData, dispatch, router]);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Alert, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
@@ -574,9 +574,9 @@ function Breathing() {
                     : "Find your calm"}
               </Text>
             </Box>
-            <TouchableOpacity onPress={showInfoAlert} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }} activeOpacity={0.7} style={styles.infoIconTouchable}>
+            <Pressable onPress={showInfoAlert} hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }} style={styles.infoIconTouchable}>
               <MaterialIcons name="info-outline" size={24} color="#7D828A" />
-            </TouchableOpacity>
+            </Pressable>
           </Box>
 
 

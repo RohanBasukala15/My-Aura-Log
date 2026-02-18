@@ -68,6 +68,7 @@
     "i18next": "^22.4.15",
     "jwt-decode": "^3.1.2",
     "lodash.isequal": "^4.5.0",
+    "lottie-react-native": "~7.3.1",
     "moment": "^2.29.4",
     "openai": "^6.8.1",
     "react": "19.1.0",

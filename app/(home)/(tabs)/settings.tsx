@@ -3,9 +3,13 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
-  TouchableOpacity, Platform, RefreshControl,
+  TouchableOpacity,
+  Platform,
+  RefreshControl,
   Modal,
-  TextInput, Switch
+  TextInput,
+  Switch,
+  Linking,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -20,8 +24,10 @@ import { JournalStorage } from "@common/services/journalStorage";
 import { BreathingStorage } from "@common/services/breathingStorage";
 import { Storage } from "@common/services/Storage";
 import { EncryptedStorage } from "@common/services/EncryptedStorage";
+import { trackUpgradeClick } from "@common/services/analyticsService";
 import { PremiumService } from "@common/services/premiumService";
 import { NotificationService } from "@common/services/notificationService";
+import { UserService } from "@common/services/userService";
 import AppConstants from "@common/assets/AppConstants";
 import { resetState } from "@common/redux/actions";
 import { store } from "@common/redux/store";
@@ -69,14 +75,6 @@ function Settings() {
   const [appVersion, setAppVersion] = useState<string>("1.0.0");
   const isInitialLoad = useRef(true);
 
-  // Define scheduleDailyNotification first so it can be used in loadSettings
-  const scheduleDailyNotification = useCallback(
-    async (time: string) => {
-      return NotificationService.scheduleDailyNotification(time, userName);
-    },
-    [userName]
-  );
-
   const requestPermissions = useCallback(async () => {
     const granted = await NotificationService.requestNotificationPermissions();
     if (!granted) {
@@ -107,18 +105,23 @@ function Settings() {
       setNotificationTime(finalTime);
       setIosTimePickerValue(createDateFromTimeString(finalTime));
 
-      // Restore notification schedule if it was enabled
+      // When enabled: daily reminder is sent by Firebase Cloud Function (FCM). Sync prefs + token to Firestore only.
       if (finalEnabled) {
-        try {
-          await scheduleDailyNotification(finalTime);
-        } catch (error) {
-          // Silently fail - user can re-enable if needed
-        }
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+        const fcmToken = await Storage.getItem<string>(AppConstants.StorageKey.fcmToken, null);
+        const isPremium = await PremiumService.isPremium();
+        await UserService.updateMotivationNotifications({
+          enabled: true,
+          notificationTime: finalTime,
+          timezone,
+          fcmToken: fcmToken ?? undefined,
+          isPremium,
+        });
       }
     } catch (error) {
       // Silently fail - settings will use defaults
     }
-  }, [scheduleDailyNotification]);
+  }, []);
 
   const loadAppVersion = useCallback(async () => {
     try {
@@ -146,8 +149,23 @@ function Settings() {
     useCallback(() => {
       if (!isInitialLoad.current) {
         loadUserName();
+        // Re-sync notification prefs to Firestore when returning (e.g. after becoming premium) so Cloud Function sends with quote
+        if (notificationsEnabled) {
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+          Storage.getItem<string>(AppConstants.StorageKey.fcmToken, null).then(fcmToken =>
+            PremiumService.isPremium().then(isPremium =>
+              UserService.updateMotivationNotifications({
+                enabled: true,
+                notificationTime,
+                timezone,
+                fcmToken: fcmToken ?? undefined,
+                isPremium,
+              })
+            )
+          );
+        }
       }
-    }, [loadUserName])
+    }, [loadUserName, notificationsEnabled, notificationTime])
   );
 
   // Pull to refresh handler
@@ -186,7 +204,8 @@ function Settings() {
   }, [userName]);
 
   const handleOpenPaywall = useCallback(() => {
-    router.push("/(home)/paywall");
+    trackUpgradeClick("settings");
+    router.push({ pathname: "/(home)/paywall", params: { source: "settings" } });
   }, [router]);
 
 
@@ -194,7 +213,6 @@ function Settings() {
   const handleNotificationTimeUpdate = useCallback(
     async (date: Date) => {
       const newTime = formatDateToTimeString(date);
-      const previousTime = notificationTime;
 
       setNotificationTime(newTime);
       setIosTimePickerValue(date);
@@ -204,17 +222,19 @@ function Settings() {
         return;
       }
 
-      try {
-        await scheduleDailyNotification(newTime);
-        showToast.success("Reminder refreshed", `We'll nudge you at ${newTime}.`);
-      } catch (error) {
-        setNotificationTime(previousTime);
-        setIosTimePickerValue(createDateFromTimeString(previousTime));
-        await Storage.setItem(NOTIFICATION_TIME_KEY, previousTime);
-        showToast.error("Couldn't update reminder", "Please try again in a moment.");
-      }
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+      const fcmToken = await Storage.getItem<string>(AppConstants.StorageKey.fcmToken, null);
+      const isPremium = await PremiumService.isPremium();
+      await UserService.updateMotivationNotifications({
+        enabled: true,
+        notificationTime: newTime,
+        timezone,
+        fcmToken: fcmToken ?? undefined,
+        isPremium,
+      });
+      showToast.success("Reminder refreshed", `We'll nudge you at ${newTime}.`);
     },
-    [notificationTime, notificationsEnabled, scheduleDailyNotification]
+    [notificationTime, notificationsEnabled]
   );
 
   const handleSelectNotificationTime = useCallback(() => {
@@ -254,31 +274,40 @@ function Settings() {
 
 
   const handleSendEmail = useCallback(async () => {
+    const email = AppConstants.Resources.contactEmail;
+    const subject = "My Aura Log Feedback";
+    const body = "Hi My Aura Log team,\n\nI wanted to reach out about...\n\n";
+
     try {
       const isAvailable = await MailComposer.isAvailableAsync();
-      if (!isAvailable) {
-        showToast.info("No email app found", `Please email us at ${AppConstants.Resources.contactEmail}`);
+      if (isAvailable) {
+        const result = await MailComposer.composeAsync({
+          recipients: [email],
+          subject,
+          body,
+        });
+        if (result.status === MailComposer.MailComposerStatus.SENT) {
+          showToast.success("Email sent successfully", "Thank you for your feedback!");
+        }
         return;
       }
 
-      const result = await MailComposer.composeAsync({
-        recipients: [AppConstants.Resources.contactEmail],
-        subject: "My Aura Log Feedback",
-        body: "Hi My Aura Log team,\n\nI wanted to reach out about...\n\n",
-      });
-
-      if (result.status === MailComposer.MailComposerStatus.SENT) {
-        showToast.success("Email sent successfully", "Thank you for your feedback!");
+      // Fallback: open mailto: (works on iOS when Mail isn't configured or user prefers another app)
+      const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const canOpen = await Linking.canOpenURL(mailtoUrl);
+      if (canOpen) {
+        await Linking.openURL(mailtoUrl);
+      } else {
+        showToast.info("No email app found", `Please email us at ${email}`);
       }
     } catch (error) {
-      showToast.error("Couldn't open email", `Please email us at ${AppConstants.Resources.contactEmail}`);
+      showToast.error("Couldn't open email", `Please email us at ${email}`);
     }
   }, []);
 
   const handleNotificationToggle = useCallback(
     async (value: boolean) => {
       if (value) {
-        // Request permissions first
         const hasPermission = await requestPermissions();
         if (!hasPermission) {
           setNotificationsEnabled(false);
@@ -290,15 +319,19 @@ function Settings() {
       await Storage.setItem(NOTIFICATION_ENABLED_KEY, value);
 
       if (value) {
-        try {
-          await scheduleDailyNotification(notificationTime);
-          showToast.success("Reminders on", `We'll check in at ${notificationTime}.`);
-        } catch (error) {
-          setNotificationsEnabled(false);
-          await Storage.setItem(NOTIFICATION_ENABLED_KEY, false);
-          showToast.error("Couldn't schedule reminder", "Please try again in a moment.");
-        }
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+        const fcmToken = await Storage.getItem<string>(AppConstants.StorageKey.fcmToken, null);
+        const isPremium = await PremiumService.isPremium();
+        await UserService.updateMotivationNotifications({
+          enabled: true,
+          notificationTime,
+          timezone,
+          fcmToken: fcmToken ?? undefined,
+          isPremium,
+        });
+        showToast.success("Reminders on", `We'll check in at ${notificationTime}—even when the app is closed.`);
       } else {
+        await UserService.updateMotivationNotifications({ enabled: false });
         try {
           await Notifications.cancelAllScheduledNotificationsAsync();
           showToast.info("Reminders off", "Jump back in whenever you like.");
@@ -307,7 +340,7 @@ function Settings() {
         }
       }
     },
-    [notificationTime, requestPermissions, scheduleDailyNotification]
+    [notificationTime, requestPermissions]
   );
 
   const handleBiometricToggle = useCallback(
@@ -559,7 +592,7 @@ function Settings() {
             Premium
           </Text>
           <Text variant="caption" color="textSubdued" marginBottom="m">
-            View monthly and lifetime plans, intro offers, and referral perks.
+            Unlimited AI plus Weekly and Daily Reflections. View plans, intro offers, and referral perks.
           </Text>
           <TouchableOpacity
             onPress={handleOpenPaywall}
