@@ -65,14 +65,14 @@ module.exports = ({ config }) => {
   const overridesConfig = {
     name: "My Aura Log",
     slug: "myauralog",
-    version: "1.0.0",
+    version: process.env.EXPO_CONFIG_version ?? "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.myauralog.app",
-      buildNumber: "8",
+      buildNumber: process.env.EXPO_CONFIG_ios_buildNumber ?? "1",
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
@@ -84,7 +84,7 @@ module.exports = ({ config }) => {
         backgroundColor: "#E8D5FF",
       },
       package: "com.myauralog",
-      versionCode: 11,
+      versionCode: 12,
       permissions: ["android.permission.CAMERA"],
       privacy: {
         privacyPolicy: "https://rohanbasukala15.github.io/My-Aura-Log/privacy-policy.html",

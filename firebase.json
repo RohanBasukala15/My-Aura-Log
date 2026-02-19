@@ -6,6 +6,17 @@
     "indexes": "firestore.indexes.json"
   },
   "functions": {
-    "source": "functions"
+    "source": "functions",
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".runtimeconfig.json",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "scripts/**",
+      "serviceAccountKey.json",
+      ".env",
+      ".env.*"
+    ]
   }
 }

@@ -21,6 +21,9 @@ web-build/
 .env
 .env.*
 
+# Firebase service account key (for local scripts only)
+functions/serviceAccountKey.json
+
 # app builds
 *.apk
 *.ipa
