@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
+  View,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -42,8 +43,10 @@ import {
   resetDraft,
 } from "@common/redux/slices/entryDraft/entryDraft.slice";
 import { MoodAnalysisService } from "@common/services/moodAnalysisService";
+import { SoulLinkService } from "@common/services/soulLinkService";
 import { BreathingRecommendation } from "@common/models/BreathingSession";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { OrbitalPresence } from "@common/components/soulLink/OrbitalPresence";
 
 import dashboardCopy from "./HeaderTitleEntity.json";
 
@@ -411,6 +414,13 @@ function Dashboard() {
       loadPackagePrices();
       loadUserName();
       dispatch(checkUpgradeAlertStatus());
+      // Soul-Link: sync latest mood so partner's Orbital Presence is up to date
+      JournalStorage.getAllEntries().then((entries) => {
+        const latest = entries[0];
+        if (latest) {
+          SoulLinkService.setMyCurrentAura(latest.mood, latest.aiInsight?.quote).catch(() => {});
+        }
+      });
     }, [loadPremiumStatus, loadPackagePrices, loadUserName, dispatch])
   );
 
@@ -658,6 +668,9 @@ function Dashboard() {
         trackFirstEntrySaved();
       }
 
+      // Soul-Link: sync current aura so partner sees Orbital Presence update in real time
+      SoulLinkService.setMyCurrentAura(entry.mood, entry.aiInsight?.quote).catch(() => {});
+
       const recommendation = MoodAnalysisService.analyzeEntry(entry);
       setBreathingRecommendation(recommendation);
 
@@ -711,20 +724,21 @@ function Dashboard() {
   );
 
   return (
-    <KeyboardAwareScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-      enableOnAndroid={true}
-      enableAutomaticScroll={true}
-    >
-      <StatusBar style="dark" />
-      <LinearGradient
-        colors={["#F8F6FF", "#FFFFFF", "#F8F6FF"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradientBackground}>
-        <Box padding="m" paddingTop="xxxl">
+    <View style={styles.dashboardWrap}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        enableOnAndroid={true}
+        enableAutomaticScroll={true}
+      >
+        <StatusBar style="dark" />
+        <LinearGradient
+          colors={["#F8F6FF", "#FFFFFF", "#F8F6FF"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.gradientBackground}>
+          <Box padding="m" paddingTop="xxxl">
           {/* Header */}
           <Box marginBottom="xl">
             <Text
@@ -894,10 +908,15 @@ function Dashboard() {
         </Box>
       </LinearGradient>
     </KeyboardAwareScrollView>
+      <OrbitalPresence />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  dashboardWrap: {
+    flex: 1,
+  },
   container: {
     flexGrow: 1,
   },

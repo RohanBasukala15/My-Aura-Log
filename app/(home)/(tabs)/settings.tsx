@@ -28,6 +28,7 @@ import { trackUpgradeClick } from "@common/services/analyticsService";
 import { PremiumService } from "@common/services/premiumService";
 import { NotificationService } from "@common/services/notificationService";
 import { UserService } from "@common/services/userService";
+import { SoulLinkService } from "@common/services/soulLinkService";
 import AppConstants from "@common/assets/AppConstants";
 import { resetState } from "@common/redux/actions";
 import { store } from "@common/redux/store";
@@ -37,6 +38,7 @@ import { useBiometricAvailability } from "@common/hooks/useBiometricAvailability
 import { authenticateWithBiometrics, formatBiometricType } from "@common/utils/biometric-utils";
 
 import { NotificationsSection } from "@common/screens/settings/NotificationsSection";
+import { SoulLinkSection } from "@common/screens/settings/SoulLinkSection";
 import { DangerZoneSection } from "@common/screens/settings/DangerZoneSection";
 import { LegalSection } from "@common/screens/settings/LegalSection";
 
@@ -192,6 +194,7 @@ function Settings() {
       await Storage.setItem("user_name", trimmedName);
       setUserName(trimmedName);
       setIsEditingName(false);
+      await SoulLinkService.setMyDisplayName(trimmedName);
       showToast.success("Name updated! ✨", `We'll call you ${trimmedName} from now on.`);
     } catch (error) {
       showToast.error("Couldn't save name", "Please try again.");
@@ -576,6 +579,7 @@ function Settings() {
           onToggleNotifications={handleNotificationToggle}
           onSelectTime={handleSelectNotificationTime}
         />
+        <SoulLinkSection />
         <Box
           marginBottom="l"
           padding="m"

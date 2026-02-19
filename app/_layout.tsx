@@ -15,6 +15,7 @@ import { NotificationProvider } from "@common/services/notification/Notification
 import { PaymentService } from "@common/services/paymentService";
 import { PremiumService } from "@common/services/premiumService";
 import { UserService } from "@common/services/userService";
+import { ensureFirebaseAuth } from "@common/services/firebase";
 
 import {
   AppConfiguration,
@@ -51,10 +52,20 @@ function ConfigurationState() {
   const appConfig = useAppConfiguration();
   const dispatch = useAppDispatch();
 
-  // TODO: observe cache state and update status with ready status;
+  // Sign in to Firebase with custom token (uid = deviceId) so Firestore rules pass. No login screen.
   useEffect(() => {
-    dispatch(loadConfiguration());
-    PremiumService.isPremium().then((isPremium) => UserService.syncPremiumStatus(isPremium)).catch(() => { /* ignore */ });
+    if (__DEV__) console.log("[App] calling ensureFirebaseAuth...");
+    ensureFirebaseAuth()
+      .then(() => {
+        if (__DEV__) console.log("[App] ensureFirebaseAuth done, loading config & premium");
+        dispatch(loadConfiguration());
+        return PremiumService.isPremium();
+      })
+      .then((isPremium) => UserService.syncPremiumStatus(isPremium))
+      .then(() => { if (__DEV__) console.log("[App] config & premium sync done"); })
+      .catch((e) => {
+        if (__DEV__) console.warn("[App] ensureFirebaseAuth or sync failed", e);
+      });
     setTimeout(() => {
       //TODO: Call this once app configuration loaded (also check if league has be selected)
       appConfig.updateState({
