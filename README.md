@@ -1,9 +1,11 @@
 
-# React Native Project My AUra Logic
-
-s
+# React Native Project My Aura Logic
 
 <Add project description>.
+
+## Credits / attributions
+
+- **Soul-Link default avatar:** Adventurer style by [Lisa Wischofsky](https://www.instagram.com/lischi_art/), via [DiceBear](https://www.dicebear.com/styles/adventurer/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 
 ## Prerequisite

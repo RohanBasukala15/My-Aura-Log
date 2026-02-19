@@ -13,6 +13,8 @@ export interface CurrentAura {
 export interface PartnerAura extends CurrentAura {
   /** Display name if partner set one */
   displayName?: string | null;
+  /** Mindfulness avatar URL (shown in PIP orb when they connect) */
+  avatarUrl?: string | null;
   /** Last time partner was in-app (for "Digital Co-Presence" / halo pulse) */
   lastActiveAt?: number | null;
 }

@@ -7,7 +7,6 @@ import {
   Platform,
   RefreshControl,
   Modal,
-  TextInput,
   Switch,
   Linking,
 } from "react-native";
@@ -28,7 +27,6 @@ import { trackUpgradeClick } from "@common/services/analyticsService";
 import { PremiumService } from "@common/services/premiumService";
 import { NotificationService } from "@common/services/notificationService";
 import { UserService } from "@common/services/userService";
-import { SoulLinkService } from "@common/services/soulLinkService";
 import AppConstants from "@common/assets/AppConstants";
 import { resetState } from "@common/redux/actions";
 import { store } from "@common/redux/store";
@@ -41,6 +39,9 @@ import { NotificationsSection } from "@common/screens/settings/NotificationsSect
 import { SoulLinkSection } from "@common/screens/settings/SoulLinkSection";
 import { DangerZoneSection } from "@common/screens/settings/DangerZoneSection";
 import { LegalSection } from "@common/screens/settings/LegalSection";
+import { Image } from "expo-image";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { SOUL_LINK_AVATAR_SEED_KEY, getAvatarUri } from "@common/constants/soulLinkAvatars";
 
 const {
   NOTIFICATION_ENABLED_KEY,
@@ -72,8 +73,7 @@ function Settings() {
     createDateFromTimeString(DEFAULT_NOTIFICATION_TIME)
   );
   const [userName, setUserName] = useState<string>("");
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState("");
+  const [avatarSeed, setAvatarSeed] = useState<string | null>(null);
   const [appVersion, setAppVersion] = useState<string>("1.0.0");
   const isInitialLoad = useRef(true);
 
@@ -90,7 +90,15 @@ function Settings() {
     try {
       const name = await Storage.getItem<string>("user_name", "");
       setUserName(name || "");
-      setNameInput(name || "");
+    } catch (error) {
+      // Silently fail
+    }
+  }, []);
+
+  const loadAvatarSeed = useCallback(async () => {
+    try {
+      const seed = await Storage.getItem<string>(SOUL_LINK_AVATAR_SEED_KEY, null);
+      setAvatarSeed(seed);
     } catch (error) {
       // Silently fail
     }
@@ -140,17 +148,19 @@ function Settings() {
     const init = async () => {
       await loadSettings();
       await loadUserName();
+      await loadAvatarSeed();
       await requestPermissions();
       await loadAppVersion();
       isInitialLoad.current = false;
     };
     init();
-  }, [loadSettings, loadUserName, requestPermissions, loadAppVersion]);
+  }, [loadSettings, loadUserName, loadAvatarSeed, requestPermissions, loadAppVersion]);
 
   useFocusEffect(
     useCallback(() => {
       if (!isInitialLoad.current) {
         loadUserName();
+        loadAvatarSeed();
         // Re-sync notification prefs to Firestore when returning (e.g. after becoming premium) so Cloud Function sends with quote
         if (notificationsEnabled) {
           const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
@@ -167,44 +177,21 @@ function Settings() {
           );
         }
       }
-    }, [loadUserName, notificationsEnabled, notificationTime])
+    }, [loadUserName, loadAvatarSeed, notificationsEnabled, notificationTime])
   );
 
-  // Pull to refresh handler
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await loadSettings();
       await loadUserName();
+      await loadAvatarSeed();
     } catch (error) {
       // Silently fail
     } finally {
       setRefreshing(false);
     }
-  }, [loadSettings, loadUserName]);
-
-  const handleSaveName = useCallback(async () => {
-    const trimmedName = nameInput.trim();
-    if (!trimmedName) {
-      showToast.error("Name can't be empty", "Please enter a name.");
-      return;
-    }
-
-    try {
-      await Storage.setItem("user_name", trimmedName);
-      setUserName(trimmedName);
-      setIsEditingName(false);
-      await SoulLinkService.setMyDisplayName(trimmedName);
-      showToast.success("Name updated! ✨", `We'll call you ${trimmedName} from now on.`);
-    } catch (error) {
-      showToast.error("Couldn't save name", "Please try again.");
-    }
-  }, [nameInput]);
-
-  const handleCancelEditName = useCallback(() => {
-    setNameInput(userName);
-    setIsEditingName(false);
-  }, [userName]);
+  }, [loadSettings, loadUserName, loadAvatarSeed]);
 
   const handleOpenPaywall = useCallback(() => {
     trackUpgradeClick("settings");
@@ -237,7 +224,7 @@ function Settings() {
       });
       showToast.success("Reminder refreshed", `We'll nudge you at ${newTime}.`);
     },
-    [notificationTime, notificationsEnabled]
+    [notificationsEnabled]
   );
 
   const handleSelectNotificationTime = useCallback(() => {
@@ -452,7 +439,7 @@ function Settings() {
           Settings
         </Text>
 
-        {/* Profile Section */}
+        {/* Profile Section - navigates to Edit Profile screen */}
         <Box
           marginBottom="l"
           padding="m"
@@ -468,71 +455,44 @@ function Settings() {
           <Text variant="h4" marginBottom="m" color="textDefault">
             Profile
           </Text>
-          {!isEditingName ? (
-            <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-              <Box flex={1}>
-                <Text variant="default" color="textSubdued" marginBottom="xs">
-                  Name
-                </Text>
-                <Text variant="h5" color="textDefault">
-                  {userName || "Not set"}
-                </Text>
-              </Box>
-              <TouchableOpacity
-                onPress={() => {
-                  setNameInput(userName);
-                  setIsEditingName(true);
-                }}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  borderRadius: 8,
-                  backgroundColor: theme.colors.backgroundHovered,
-                }}>
-                <Text variant="button" style={{ color: theme.colors.primary }}>
-                  Edit
-                </Text>
-              </TouchableOpacity>
-            </Box>
-          ) : (
-            <Box>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => router.push("/(home)/edit-profile" as never)}
+            style={styles.profileRow}>
+            <Box flex={1}>
               <Text variant="default" color="textSubdued" marginBottom="xs">
                 Name
               </Text>
-              <TextInput
-                style={[
-                  styles.nameInput,
-                  {
-                    borderColor: theme.colors.borderSubdued,
-                    color: theme.colors.textDefault,
-                    backgroundColor: theme.colors.backgroundDefault,
-                  },
-                ]}
-                placeholder="Enter your name"
-                placeholderTextColor={theme.colors.textSubdued}
-                value={nameInput}
-                onChangeText={setNameInput}
-                autoFocus
-                maxLength={50}
-              />
-              <Box flexDirection="row" marginTop="s" gap="s">
-                <Box flex={1}>
-                  <TouchableOpacity onPress={handleCancelEditName} style={[styles.modalButton, styles.cancelButton]}>
-                    <Text variant="button" color="textDefault" textAlign="center">
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                </Box>
-                <Box flex={1}>
-                  <TouchableOpacity onPress={handleSaveName} style={[styles.modalButton, styles.applyButton]}>
-                    <Text variant="button" style={{ color: "#FFFFFF" }} textAlign="center">
-                      Save
-                    </Text>
-                  </TouchableOpacity>
-                </Box>
-              </Box>
+              <Text variant="h5" color="textDefault">
+                {userName || "Not set"}
+              </Text>
             </Box>
-          )}
+            <Box flexDirection="row" alignItems="center" gap="s">
+              <Box
+                overflow="hidden"
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: theme.colors.backgroundDefault,
+                }}>
+                {avatarSeed ? (
+                  <Image
+                    source={{ uri: getAvatarUri(avatarSeed, 40) }}
+                    style={{ width: 40, height: 40 }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Box style={{ width: 40, height: 40 }} alignItems="center" justifyContent="center">
+                    <Text variant="caption" color="textSubdued">
+                      {userName?.slice(0, 1)?.toUpperCase() ?? "?"}
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={theme.colors.textSubdued} />
+            </Box>
+          </TouchableOpacity>
         </Box>
 
         {/* Security Section - Biometric Authentication */}
@@ -697,6 +657,11 @@ function Settings() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
+  },
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
   },
   nameInput: {
     borderWidth: 1,

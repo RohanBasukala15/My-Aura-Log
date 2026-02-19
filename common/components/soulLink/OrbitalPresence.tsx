@@ -10,6 +10,7 @@ import {
   PanResponder,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -32,6 +33,18 @@ const TAP_THRESHOLD = 8;
 const PADDING = 12;
 
 /**
+ * Default avatar when partner has no soulLinkAvatarUrl set.
+ * Uses DiceBear Adventurer (CC BY 4.0): https://www.dicebear.com/styles/adventurer/
+ * Same seed always returns the same avatar.
+ */
+const DICEBEAR_ADVENTURER_BASE = "https://api.dicebear.com/9.x/adventurer/png";
+
+function getDefaultAvatarUri(seed: string): string {
+  const safeSeed = seed.trim() || "SoulLink";
+  return `${DICEBEAR_ADVENTURER_BASE}?seed=${encodeURIComponent(safeSeed)}&size=128`;
+}
+
+/**
  * PiP-style Orbital Presence: draggable floating bubble (top-right by default), stays on top.
  * Tap opens popup with archetype, Oracle snippet, and Send Pulse.
  */
@@ -40,6 +53,7 @@ export function OrbitalPresence() {
   const insets = useSafeAreaInsets();
   const {
     isLinked,
+    partnerId,
     partnerDisplayName,
     partnerAura,
     isPartnerPresent,
@@ -110,7 +124,7 @@ export function OrbitalPresence() {
         const nextY = Math.min(maxY, Math.max(minY, dragStart.current.y + gestureState.dy));
         setPosition({ x: nextX, y: nextY });
       },
-      onPanResponderRelease: (_, gestureState) => {
+      onPanResponderRelease: () => {
         if (totalMove.current < TAP_THRESHOLD) {
           setPopupVisible(true);
         }
@@ -121,6 +135,9 @@ export function OrbitalPresence() {
   const haloColor = partnerAura?.colorHex ?? theme.colors.primary;
   const archetype = partnerAura ? getArchetypeById(partnerAura.archetypeId) : null;
   const displayName = partnerDisplayName ?? partnerAura?.displayName ?? "Your Soul-Link";
+  const partnerAvatarUrl = partnerAura?.avatarUrl ?? null;
+  const defaultAvatarSeed = partnerId ?? displayName;
+  const avatarImageUri = partnerAvatarUrl ?? getDefaultAvatarUri(defaultAvatarSeed);
 
   const haloAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: haloPulse.value }],
@@ -156,7 +173,11 @@ export function OrbitalPresence() {
             ]}
           />
           <View style={[styles.avatarCircle, { backgroundColor: theme.colors.surfaceDefault }]}>
-            <MaterialCommunityIcons name="heart-outline" size={AVATAR_SIZE * 0.5} color={haloColor} />
+            <Image
+              source={{ uri: avatarImageUri }}
+              style={styles.avatarImage}
+              contentFit="cover"
+            />
           </View>
         </View>
       </View>
@@ -188,7 +209,7 @@ export function OrbitalPresence() {
                     fontStyle="italic"
                     style={styles.oracleSnippet}
                   >
-                    "{partnerAura.oracleSnippet}"
+                    {`"${partnerAura.oracleSnippet}"`}
                   </Text>
                 ) : null}
                 <TouchableOpacity
@@ -254,6 +275,11 @@ const styles = StyleSheet.create({
     borderRadius: AVATAR_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
   },
   modalBackdrop: {
     flex: 1,

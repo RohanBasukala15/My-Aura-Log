@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { StyleSheet, TouchableOpacity, TextInput, Share, Alert, ActivityIndicator } from "react-native";
 import Toast from "react-native-toast-message";
+import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { Box, Text, useTheme } from "@common/components/theme";
 import { SoulLinkService } from "@common/services/soulLinkService";
@@ -15,6 +17,7 @@ const TOAST = {
 
 export function SoulLinkSection() {
   const theme = useTheme();
+  const router = useRouter();
   const { partnerId, partnerDisplayName } = useSoulLinkPartner();
   const [linkCode, setLinkCode] = useState<string>("");
   const [partnerCodeInput, setPartnerCodeInput] = useState("");
@@ -146,6 +149,26 @@ export function SoulLinkSection() {
         </Box>
       ) : (
         <>
+          <TouchableOpacity
+            onPress={() => router.push("/(home)/soul-link-connect")}
+            activeOpacity={0.9}
+            style={styles.connectSoulsButtonWrap}
+          >
+            <LinearGradient
+              colors={["#9B87F5", "#7DD3C0"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.connectSoulsButton}
+            >
+              <MaterialCommunityIcons name="heart-pulse" size={22} color="#FFF" />
+              <Text variant="button" style={styles.connectSoulsButtonText}>
+                Connect Souls
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <Text variant="caption" color="textSubdued" marginBottom="m" textAlign="center">
+            Enter their code to link. Avatars come from each person&apos;s profile.
+          </Text>
           <Box marginBottom="m">
             <Text variant="default" color="textSubdued" marginBottom="xs">
               Your code (share so they can link with you)
@@ -171,7 +194,7 @@ export function SoulLinkSection() {
           </Box>
           <Box marginBottom="m">
             <Text variant="default" color="textSubdued" marginBottom="xs">
-              Enter their code to link
+              Or enter their code to link quickly (no avatars)
             </Text>
             <TextInput
               style={[
@@ -251,5 +274,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     minHeight: 48,
+  },
+  connectSoulsButtonWrap: {
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 8,
+    shadowColor: "#9B87F5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  connectSoulsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  connectSoulsButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

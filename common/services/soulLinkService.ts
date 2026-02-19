@@ -16,7 +16,8 @@ import {
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
-import { db, functions, isFirebaseConfigured } from "./firebase";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { db, functions, storage, isFirebaseConfigured } from "./firebase";
 import { getDeviceId } from "../utils/device-utils";
 import { Storage } from "./Storage";
 import type { CurrentAura, PartnerAura } from "@common/models/SoulLink";
@@ -42,6 +43,8 @@ type UserDocSoulLink = {
   lastActiveAt?: number | null;
   /** Optional display name for this user (shown to partner) */
   soulLinkDisplayName?: string | null;
+  /** Optional mindfulness avatar URL (shown in partner's PIP orb) */
+  soulLinkAvatarUrl?: string | null;
   updatedAt?: unknown;
 };
 
@@ -123,6 +126,15 @@ export const SoulLinkService = {
     const snap = await getDoc(doc(db, USERS_COLLECTION, partnerDeviceId));
     const name = snap.exists() ? (snap.data() as { soulLinkDisplayName?: string | null })?.soulLinkDisplayName : null;
     return name && typeof name === "string" ? name : null;
+  },
+
+  /** Get my mindfulness avatar URL from Firestore (for settings preview). */
+  async getMyAvatarUrl(): Promise<string | null> {
+    const refData = await getUserRef();
+    if (!refData) return null;
+    const snap = await getDoc(refData.ref);
+    const url = snap.exists() ? (snap.data() as UserDocSoulLink)?.soulLinkAvatarUrl : null;
+    return url && typeof url === "string" ? url : null;
   },
 
   /**
@@ -210,6 +222,65 @@ export const SoulLinkService = {
   },
 
   /**
+   * Set my mindfulness avatar URL (shown in partner's PIP orb when they're linked).
+   */
+  async setMyAvatarUrl(avatarUrl: string | null): Promise<boolean> {
+    const refData = await getUserRef();
+    if (!refData) return false;
+    await setDoc(
+      refData.ref,
+      sanitize({
+        soulLinkAvatarUrl: avatarUrl ?? null,
+        updatedAt: serverTimestamp(),
+      }),
+      { merge: true }
+    );
+    return true;
+  },
+
+  /**
+   * Set partner's avatar URL (User A sets avatar for User B).
+   * Calls Cloud Function setPartnerAvatar; requires the function to be deployed.
+   */
+  async setPartnerAvatarUrl(partnerDeviceId: string, avatarUrl: string): Promise<boolean> {
+    if (!isFirebaseConfigured || !functions) return false;
+    try {
+      const setPartnerAvatar = httpsCallable<
+        { partnerDeviceId: string; avatarUrl: string },
+        { ok: boolean }
+      >(functions, "setPartnerAvatar");
+      const { data } = await setPartnerAvatar({
+        partnerDeviceId: partnerDeviceId.trim(),
+        avatarUrl: avatarUrl.trim(),
+      });
+      return data?.ok === true;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Upload a mindfulness avatar from a data URL (e.g. from image picker with base64).
+   * Saves to Storage, then sets the download URL on the user doc.
+   * Returns the public URL or null on failure.
+   */
+  async uploadAvatarFromDataUrl(dataUrl: string): Promise<string | null> {
+    if (!isFirebaseConfigured || !storage) return null;
+    const refData = await getUserRef();
+    if (!refData) return null;
+    const path = `soulLinkAvatars/${refData.deviceId}.jpg`;
+    const storageRef = ref(storage, path);
+    try {
+      await uploadString(storageRef, dataUrl, "data_url");
+      const url = await getDownloadURL(storageRef);
+      await SoulLinkService.setMyAvatarUrl(url);
+      return url;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * Sync current aura to Firestore from latest mood (and optional oracle snippet).
    * Call after saving a journal entry or when opening the app.
    */
@@ -262,6 +333,7 @@ export const SoulLinkService = {
           oracleSnippet: d.currentAura.oracleSnippet ?? null,
           updatedAt: d.currentAura.updatedAt,
           displayName: d.soulLinkDisplayName ?? null,
+          avatarUrl: d.soulLinkAvatarUrl ?? null,
           lastActiveAt: d.lastActiveAt ?? null,
         };
         onUpdate(aura);

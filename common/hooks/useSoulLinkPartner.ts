@@ -6,7 +6,7 @@ import type { PartnerAura } from "@common/models/SoulLink";
 
 const PRESENCE_THRESHOLD_MS = 2 * 60 * 1000; // 2 min = "recently active" for halo pulse
 
-function noop() {}
+const noop = () => {};
 
 export function useSoulLinkPartner() {
   const [partnerId, setPartnerId] = useState<string | null>(null);

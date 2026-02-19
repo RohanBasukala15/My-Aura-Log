@@ -7,6 +7,7 @@ import {
   type Auth,
 } from "firebase/auth";
 import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { getDeviceId } from "../utils/device-utils";
@@ -39,6 +40,7 @@ const auth: Auth = initializeAuth(app, {
 });
 // Use explicit region so callables resolve (default us-central1)
 const functions: Functions = getFunctions(app, "us-central1");
+const storage: FirebaseStorage = getStorage(app);
 
 const isFirebaseConfigured = !missingKeys.length && !!app;
 
@@ -99,5 +101,5 @@ LOG("signInWithCustomToken success, uid suffix", uid.slice(-6));
     }
 }
 
-export { db, auth, functions, isFirebaseConfigured, ensureFirebaseAuth };
+export { db, auth, functions, storage, isFirebaseConfigured, ensureFirebaseAuth };
 export default app;

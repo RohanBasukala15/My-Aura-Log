@@ -21,6 +21,12 @@ import { UserService } from "@common/services/userService";
 import { GRADIENTS } from "@common/components/theme/gradients";
 import { Image } from "expo-image";
 import { useBiometricAvailability } from "@common/hooks/useBiometricAvailability";
+import { SoulLinkService } from "@common/services/soulLinkService";
+import {
+  STARTER_SEEDS,
+  SOUL_LINK_AVATAR_SEED_KEY,
+  getAvatarUri,
+} from "@common/constants/soulLinkAvatars";
 import { authenticateWithBiometrics, formatBiometricType } from "@common/utils/biometric-utils";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
@@ -34,6 +40,7 @@ const ONBOARDING_IMAGES = {
 
 interface OnboardingData {
   user_name?: string;
+  avatar_seed?: string;
   daily_notifications?: boolean;
   notification_time?: string;
   biometric_enabled?: boolean;
@@ -56,6 +63,11 @@ export default function OnboardingScreen() {
     // Save onboarding data if needed
     if (onboardingData.user_name) {
       await Storage.setItem("user_name", onboardingData.user_name);
+    }
+    if (onboardingData.avatar_seed) {
+      await Storage.setItem(SOUL_LINK_AVATAR_SEED_KEY, onboardingData.avatar_seed);
+      const avatarUrl = getAvatarUri(onboardingData.avatar_seed, 128);
+      SoulLinkService.setMyAvatarUrl(avatarUrl).catch(() => {});
     }
 
     // Save notification settings using the same keys as settings screen
@@ -121,6 +133,9 @@ export default function OnboardingScreen() {
             step={step}
             value={onboardingData[step.input?.key as keyof OnboardingData] as string}
             onChange={value => updateOnboardingData(step.input?.key || "", value)}
+            avatarSeed={onboardingData.avatar_seed}
+            onAvatarSelect={seed => updateOnboardingData("avatar_seed", seed)}
+            showAvatarPicker={step.input?.key === "user_name"}
             onNext={handleNext}
           />
         );
@@ -166,7 +181,10 @@ export default function OnboardingScreen() {
             initialPage={0}
             onPageSelected={handlePageSelected}
             scrollEnabled={
-              currentPage !== 1 || (currentPage === 1 && !!onboardingData.user_name?.trim())
+              currentPage !== 1 ||
+              (currentPage === 1 &&
+                !!onboardingData.user_name?.trim() &&
+                !!onboardingData.avatar_seed)
             }>
             {ONBOARDING_STEPS.map(step => (
               <Box key={step.step} flex={1}>
@@ -278,20 +296,33 @@ function WelcomeStep({ step, onNext }: WelcomeStepProps) {
   );
 }
 
-// Input Step Component
+// Input Step Component (name + optional avatar picker for step 2)
 interface InputStepProps {
   step: OnboardingStep;
   value?: string;
   onChange: (value: string) => void;
+  avatarSeed?: string;
+  onAvatarSelect?: (seed: string) => void;
+  showAvatarPicker?: boolean;
   onNext: () => void;
 }
 
-function InputStep({ step, value = "", onChange, onNext }: InputStepProps) {
+const AVATAR_PICKER_SIZE = 56;
+
+function InputStep({
+  step,
+  value = "",
+  onChange,
+  avatarSeed,
+  onAvatarSelect,
+  showAvatarPicker,
+  onNext,
+}: InputStepProps) {
   const [inputValue, setInputValue] = useState(value);
+  const theme = useTheme();
 
   const handleInputChange = (text: string) => {
     setInputValue(text);
-    // Update parent state immediately so PagerView can control scrolling
     onChange(text);
   };
 
@@ -302,21 +333,60 @@ function InputStep({ step, value = "", onChange, onNext }: InputStepProps) {
     }
   };
 
-  const hasValue = !!inputValue.trim();
+  const hasName = !!inputValue.trim();
+  const hasAvatar = !showAvatarPicker || !!avatarSeed;
+  const canContinue = hasName && hasAvatar;
 
   return (
     <OnboardingStepLayout
       step={step}
-      scrollEnabled={hasValue}
+      scrollEnabled={canContinue}
       content={
-        <TextInput
-          placeholder={step.input?.placeholder || ""}
-          value={inputValue}
-          onChangeText={handleInputChange}
-          autoFocus
-          returnKeyType="done"
-          onSubmitEditing={handleNext}
-        />
+        <Box>
+          <TextInput
+            placeholder={step.input?.placeholder || ""}
+            value={inputValue}
+            onChangeText={handleInputChange}
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleNext}
+            style={[
+              styles.nameInput,
+              {
+                borderColor: theme.colors.borderSubdued,
+                color: theme.colors.textDefault,
+                backgroundColor: theme.colors.backgroundDefault,
+              },
+            ]}
+          />
+          {showAvatarPicker && (
+            <Box marginTop="l">
+              <Text variant="default" color="textDefault" marginBottom="s">
+                Choose your avatar
+              </Text>
+              <Box flexDirection="row" flexWrap="wrap" gap="s" justifyContent="center">
+                {STARTER_SEEDS.map(seed => {
+                  const isSelected = avatarSeed === seed;
+                  return (
+                    <TouchableOpacity
+                      key={seed}
+                      onPress={() => onAvatarSelect?.(seed)}
+                      style={[
+                        styles.avatarSlot,
+                        isSelected && { borderColor: theme.colors.primary, borderWidth: 3 },
+                      ]}
+                    >
+                      <Image
+                        source={{ uri: getAvatarUri(seed, AVATAR_PICKER_SIZE) }}
+                        style={styles.avatarImage}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </Box>
+            </Box>
+          )}
+        </Box>
       }
       buttons={
         <Button
@@ -324,7 +394,7 @@ function InputStep({ step, value = "", onChange, onNext }: InputStepProps) {
           variant="primary"
           size="large"
           onPress={handleNext}
-          disabled={!hasValue}
+          disabled={!canContinue}
           style={styles.button}
         />
       }
@@ -731,6 +801,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+  },
+  nameInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    fontSize: 16,
+  },
+  avatarSlot: {
+    width: AVATAR_PICKER_SIZE + 8,
+    height: AVATAR_PICKER_SIZE + 8,
+    borderRadius: (AVATAR_PICKER_SIZE + 8) / 2,
+    borderWidth: 2,
+    borderColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: AVATAR_PICKER_SIZE,
+    height: AVATAR_PICKER_SIZE,
   },
 });
 
